@@ -15,7 +15,6 @@ class DatabaseManager:
         return sqlite3.connect(self.db_path)
 
     def init_db(self):
-        # Thêm cột end_time
         query = """
         CREATE TABLE IF NOT EXISTS events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,34 +22,33 @@ class DatabaseManager:
             original_text TEXT,
             location TEXT,
             start_time TIMESTAMP,
-            end_time TIMESTAMP,  -- <--- THÊM DÒNG NÀY
+            end_time TIMESTAMP,
             reminder_minutes INTEGER DEFAULT 0,
+            is_all_day INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """
         with self.get_connection() as conn:
             conn.execute(query)
+            try: conn.execute("ALTER TABLE events ADD COLUMN is_all_day INTEGER DEFAULT 0")
+            except: pass
 
     def add_event(self, data: dict):
-        # Insert cả end_time
         query = """
-        INSERT INTO events (event_content, original_text, location, start_time, end_time, reminder_minutes)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO events (event_content, original_text, location, start_time, end_time, reminder_minutes, is_all_day)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """
+        is_all_day_int = 1 if data.get('is_all_day') else 0
         with self.get_connection() as conn:
             conn.execute(query, (
-                data.get('event'), 
-                data.get('original_text'),
-                data.get('location'),
-                data.get('start_time'),
-                data.get('end_time'), # <--- THÊM DÒNG NÀY
-                data.get('reminder_minutes', 0)
+                data.get('event'), data.get('original_text'), data.get('location'),
+                data.get('start_time'), data.get('end_time'),
+                data.get('reminder_minutes', 0), is_all_day_int
             ))
             conn.commit()
     
     def get_all_events(self):
-        # Select thêm end_time
-        query = "SELECT id, event_content, start_time, end_time, location, reminder_minutes FROM events ORDER BY start_time ASC"
+        query = "SELECT id, event_content, start_time, end_time, location, reminder_minutes, is_all_day, original_text FROM events ORDER BY start_time ASC"
         conn = self.get_connection()
         df = pd.read_sql_query(query, conn)
         conn.close()
@@ -62,18 +60,18 @@ class DatabaseManager:
             conn.execute(query, (event_id,))
             conn.commit()
 
-    # --- HÀM MỚI: CẬP NHẬT SỰ KIỆN ---
-    def update_event(self, event_id, content, location, time, reminder):
+    # [CẬP NHẬT] Hàm update nhận thêm end_time
+    def update_event(self, event_id, content, location, start_time, end_time, reminder, is_all_day):
         query = """
         UPDATE events 
-        SET event_content = ?, location = ?, start_time = ?, reminder_minutes = ?
+        SET event_content = ?, location = ?, start_time = ?, end_time = ?, reminder_minutes = ?, is_all_day = ?
         WHERE id = ?
         """
+        is_all_day_int = 1 if is_all_day else 0
         with self.get_connection() as conn:
-            conn.execute(query, (content, location, time, reminder, event_id))
+            conn.execute(query, (content, location, start_time, end_time, reminder, is_all_day_int, event_id))
             conn.commit()
     
-    # --- HÀM MỚI: LẤY 1 SỰ KIỆN ĐỂ SỬA ---
     def get_event_by_id(self, event_id):
         query = "SELECT * FROM events WHERE id = ?"
         conn = self.get_connection()

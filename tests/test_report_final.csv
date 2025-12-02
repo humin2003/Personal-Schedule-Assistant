@@ -1,0 +1,33 @@
+﻿ID,Câu lệnh (Input),Mong đợi,Thực tế,Kết quả
+1,Họp team lúc 9h sáng mai,09:00,09:00,PASS
+2,Đi ăn tối lúc 19h30 hôm nay,19:30,19:30,PASS
+3,Nhắc tôi nộp báo cáo lúc 14g chiều mai,14:00,14:00,PASS
+4,Tối nay 8 giờ đi xem phim,20:00,20:00,PASS
+5,Sáng mai 8h30 đi học,08:30,08:30,PASS
+6,Thứ 2 tuần sau họp giao ban lúc 9h,09:00,09:00,PASS
+7,Chiều nay lúc 5h đi đá bóng,17:00,17:00,PASS
+8,Nhắc tôi uống thuốc lúc 21h,21:00,21:00,PASS
+9,Gọi cho mẹ lúc 8 giờ tối nay,20:00,20:00,PASS
+10,Cuộc hẹn với khách hàng lúc 10:00 sáng mai,10:00,10:00,PASS
+11,Lúc 15h chiều nay đi siêu thị,15:00,15:00,PASS
+12,Họp phụ huynh lúc 8h sáng chủ nhật,08:00,08:00,PASS
+13,Đi bơi lúc 17g30 chiều nay,17:30,17:30,PASS
+14,Học tiếng Anh lúc 19h tối mai,19:00,19:00,PASS
+15,Gửi email lúc 9h sáng thứ 6,09:00,09:00,PASS
+16,Đi dạo lúc 6 giờ sáng mai,06:00,06:00,PASS
+17,Nhắc tôi đón con lúc 4h30 chiều nay,16:30,16:30,PASS
+18,Tối mai lúc 20h30 xem bóng đá,20:30,20:30,PASS
+19,Họp nhóm lúc 14 giờ chiều thứ 5,14:00,14:00,PASS
+20,Sáng nay lúc 10h nộp bài tập,10:00,10:00,PASS
+21,Đi cafe lúc 20h tối thứ 7,20:00,20:00,PASS
+22,Khám bệnh lúc 7h30 sáng mai,07:30,07:30,PASS
+23,Lúc 22h đi ngủ,22:00,22:00,PASS
+24,Trưa mai 11h30 ăn cơm với đối tác,11:30,11:30,PASS
+25,Chiều thứ 4 lúc 3h họp online,15:00,15:00,PASS
+26,Sinh nhật bạn lúc 19h tối nay,19:00,19:00,PASS
+27,Chạy bộ lúc 5 giờ 30 sáng mai,05:30,05:30,PASS
+28,Nhắc tôi tưới cây lúc 17h chiều nay,17:00,17:00,PASS
+29,Đi chợ lúc 9h sáng chủ nhật tuần sau,09:00,09:00,PASS
+30,Làm đồ án lúc 8h tối nay,20:00,20:00,PASS
+,,,,
+,ĐỘ CHÍNH XÁC: 100.00%,,,

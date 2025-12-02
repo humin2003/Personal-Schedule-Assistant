@@ -5,7 +5,7 @@ import json
 # Đoạn này quan trọng: Giúp Python tìm thấy folder 'src'
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
-from nlp_engine import NLPEngine
+from src.nlp import NLPEngine
 
 def main():
     engine = NLPEngine()

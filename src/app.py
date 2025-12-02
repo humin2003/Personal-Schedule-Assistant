@@ -5,10 +5,12 @@ import os
 import time
 import threading
 import sqlite3
+import json
 from datetime import datetime, timedelta
-
-# --- IMPORT THƯ VIỆN CALENDAR ---
 from streamlit_calendar import calendar
+
+# --- CONFIG ---
+st.set_page_config(page_title="Trợ lý Lịch trình AI", page_icon="📅", layout="wide")
 
 # Thử import notification
 try:
@@ -22,323 +24,292 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-from src.nlp_engine import NLPEngine
+# --- [QUAN TRỌNG] IMPORT MODULES ---
+from src.nlp import NLPEngine
 from src.database import DatabaseManager
 
-# --- CONFIG ---
-st.set_page_config(page_title="Trợ lý Lịch trình AI", page_icon="📅", layout="wide")
-
-# Khởi tạo object (chỉ 1 lần để tối ưu)
-if 'db' not in st.session_state:
-    st.session_state.db = DatabaseManager()
-if 'nlp' not in st.session_state:
-    st.session_state.nlp = NLPEngine()
-
+# --- INIT STATE ---
+if 'db' not in st.session_state: st.session_state.db = DatabaseManager()
+if 'nlp' not in st.session_state: st.session_state.nlp = NLPEngine()
 db = st.session_state.db
 nlp = st.session_state.nlp
 
 # --- BACKGROUND THREAD ---
-# Sửa lại trong app.py
 def run_scheduler():
     while True:
         try:
-            # Tạo connection thủ công mỗi lần quét để tránh lỗi "SQLite objects created in a thread..."
-            # Quan trọng: Phải import sqlite3 và trỏ đúng đường dẫn file db
-            conn = sqlite3.connect('data/schedule.db') 
+            conn = sqlite3.connect('data/schedule.db')
             cursor = conn.cursor()
-            
-            # Query lấy các sự kiện sắp diễn ra trong 1 phút tới
             now = datetime.now()
-            next_minute = now + timedelta(minutes=1)
-            
-            # Logic này đơn giản hơn dataframe nhiều
-            cursor.execute("SELECT event_content, start_time, location, reminder_minutes FROM events")
+            cursor.execute("SELECT event_content, start_time, location, reminder_minutes, is_all_day FROM events")
             rows = cursor.fetchall()
-            
             for row in rows:
-                event_content, start_str, loc, rem_min = row
+                event_content, start_str, loc, rem_min, is_all_day = row
+                if is_all_day: continue 
+                
                 start_dt = datetime.fromisoformat(start_str)
                 rem_time = start_dt - timedelta(minutes=rem_min)
-                
-                # Nếu thời gian hiện tại trùng khớp thời gian nhắc (trong khoảng 60s)
                 if rem_time <= now <= rem_time + timedelta(seconds=59):
-                     notification.notify(
-                        title=f"🔔 Sắp diễn ra: {event_content}",
-                        message=f"Lúc {start_dt.strftime('%H:%M')} tại {loc}",
-                        timeout=10
-                    )
+                     notification.notify(title=f"🔔 Lời nhắc: {event_content}", message=f"Lúc {start_dt.strftime('%H:%M')} tại {loc}", app_name="Lời nhắc", timeout=10)
             conn.close()
-        except Exception as e:
-            print(f"Lỗi Scheduler: {e}")
-        
+        except Exception: pass
         time.sleep(60)
 
 if 'scheduler_started' not in st.session_state:
     threading.Thread(target=run_scheduler, daemon=True).start()
     st.session_state['scheduler_started'] = True
 
-# --- GIAO DIỆN CHÍNH ---
+# --- HEADER ---
 st.title("📅 Trợ lý Quản lý Lịch trình Thông minh")
+st.markdown("---")
 
-tab1, tab2, tab3 = st.tabs(["➕ Thêm sự kiện", "🗓️ Xem Lịch Tháng", "⚙️ Quản lý & Danh sách"])
+tab1, tab2, tab3 = st.tabs(["➕ Thêm sự kiện", "🗓️ Xem Lịch Biểu", "⚙️ Quản lý & Xuất file"])
 
-# --- TAB 1: NHẬP LIỆU (ĐÃ SỬA LỖI STATE) ---
+# --- TAB 1: THÊM SỰ KIỆN ---
 with tab1:
-    st.subheader("Nhập liệu ngôn ngữ tự nhiên")
-
-    # [FIX] Hàm Callback: Chạy xử lý TRƯỚC khi giao diện render lại
+    st.subheader("💬 Nhập liệu ngôn ngữ tự nhiên")
+    st.caption("Ví dụ: 'Họp team lúc 9h đến 11h sáng mai ở phòng 302', 'Mai đi chơi cả ngày'")
+    
     def handle_add_event():
-        # Lấy text từ session_state thông qua key
         raw_text = st.session_state.input_main
-        
         if raw_text.strip():
-            # Xử lý NLP & DB
-            data = nlp.process(raw_text)
-            db.add_event(data)
-            
-            # Thông báo
-            st.toast(f"✅ Đã thêm: {data['event']}", icon="🎉")
-            
-            # Xóa trắng ô nhập liệu (An toàn tuyệt đối ở đây)
-            st.session_state.input_main = ""
+            try:
+                data = nlp.process(raw_text)
+                db.add_event(data)
+                st.toast(f"✅ Đã thêm: {data['event']}", icon="🎉")
+                st.session_state.input_main = ""
+            except ValueError as e:
+                st.toast(f"❌ Lỗi: {str(e)}", icon="⚠️")
 
-    col_input, col_btn = st.columns([5, 1])
-    with col_input:
-        # Key="input_main" để liên kết với session_state
-        st.text_input(
-            "Ví dụ: 'Họp team tại phòng 302 lúc 9h sáng mai'", 
-            key="input_main"
-        )
-    with col_btn:
-        st.write("") 
-        st.write("") 
-        # Gắn hàm handle_add_event vào nút bấm
-        st.button("Thêm ngay", type="primary", on_click=handle_add_event)
+    c1, c2 = st.columns([5, 1])
+    with c1: st.text_input("Nhập câu lệnh tại đây:", key="input_main", placeholder="Gõ lệnh và nhấn Enter hoặc nút Thêm...")
+    with c2: 
+        st.write("")
+        st.write("")
+        st.button("✨ Thêm ngay", type="primary", on_click=handle_add_event, width='stretch')
 
-    st.divider()
-    st.caption("Sự kiện sắp tới:")
+    st.write("")
+    st.markdown("##### 🕒 Sự kiện sắp tới")
     df_preview = db.get_all_events().head(5)
-    st.dataframe(df_preview[['event_content', 'start_time', 'location']], hide_index=True)
+    if not df_preview.empty:
+        st.dataframe(df_preview[['event_content', 'start_time', 'location']], hide_index=True, width='stretch')
 
-# --- TAB 2: LỊCH THÁNG ---
-# --- TAB 2: LỊCH THÁNG (ĐÃ NÂNG CẤP GIAO DIỆN) ---
-# --- TAB 2: LỊCH THÁNG (FIX LỖI HIỂN THỊ & CHIỀU CAO) ---
-# --- TAB 2: LỊCH BIỂU (PHIÊN BẢN MODERN DARK UI) ---
-# --- TAB 2: LỊCH BIỂU (PHIÊN BẢN FIX FINAL - ỔN ĐỊNH NHẤT) ---
+# --- TAB 2: LỊCH BIỂU ---
 with tab2:
     df_events = db.get_all_events()
     
-    if df_events.empty:
-        st.info("📭 Chưa có sự kiện nào. Hãy qua tab 'Thêm sự kiện' để tạo mới!")
-    else:
-        # Move radio ra giữa
-        c1, c2, c3 = st.columns([1, 2, 1])
-        with c2:
-            view_mode = st.radio("Chế độ xem:", ["📅 Lịch biểu", "📝 Danh sách chi tiết"], horizontal=True, label_visibility="collapsed")
-        
-        if view_mode == "📅 Lịch biểu":
-            calendar_events = []
+    c_view, _ = st.columns([2, 5])
+    with c_view:
+        view_mode = st.radio("Chế độ xem:", ["Lịch đồ họa", "Danh sách"], horizontal=True, label_visibility="collapsed", index=0)
+
+    if view_mode == "Lịch đồ họa":
+        calendar_events = []
+        for _, row in df_events.iterrows():
+            try:
+                event_dt = pd.to_datetime(row['start_time'])
+                iso_start = event_dt.strftime("%Y-%m-%dT%H:%M:%S")
+                # Xử lý end_time
+                if row['end_time']:
+                    end_dt = pd.to_datetime(row['end_time'])
+                else:
+                    end_dt = event_dt + timedelta(minutes=60)
+                iso_end = end_dt.strftime("%Y-%m-%dT%H:%M:%S")
+                
+                is_past = event_dt < datetime.now()
+                color = "#6c757d" if is_past else "#3a86ff"
+                is_all_day_db = bool(row.get('is_all_day', 0))
+                title_text = row['event_content'].strip().capitalize()
+                
+                calendar_events.append({
+                    "title": title_text,
+                    "start": iso_start,
+                    "end": iso_end,
+                    "backgroundColor": color,
+                    "borderColor": color,
+                    "allDay": is_all_day_db
+                })
+            except: continue
+
+        calendar_options = {
+            "headerToolbar": {
+                "left": "prev,next today",
+                "center": "title",
+                "right": "dayGridMonth,timeGridWeek,listWeek"
+            },
+            "buttonText": {
+                "today": "Hôm nay",
+                "dayGridMonth": "Tháng",
+                "timeGridWeek": "Tuần",
+                "listWeek": "Danh sách"
+            },
+            "initialView": "dayGridMonth",
+            "eventDisplay": "block",
+            "height": 700,
+            "slotMinTime": "06:00:00",
+            "slotMaxTime": "24:00:00",
+            "allDaySlot": True,
+            "navLinks": True,
             
-            def clean_title(text):
-                if not text: return "Sự kiện"
-                text = text.replace("'", "").replace('"', "").strip()
-                return text[0].upper() + text[1:]
-
-            for _, row in df_events.iterrows():
-                try:
-                    # start
-                    event_dt = pd.to_datetime(row['start_time'])
-                    iso_start = event_dt.strftime("%Y-%m-%dT%H:%M:%S")
-                    
-                    # end - LẤY TỪ DB
-                    if row['end_time']:
-                        end_dt = pd.to_datetime(row['end_time'])
-                    else:
-                        # Fallback nếu dữ liệu cũ không có end_time
-                        end_dt = event_dt + timedelta(minutes=60)
-                        
-                    iso_end = end_dt.strftime("%Y-%m-%dT%H:%M:%S")
-                    
-
-                    is_past = event_dt < datetime.now()
-                    color = "#495057" if is_past else "#3a86ff" 
-                    
-                    calendar_events.append({
-                        "title": clean_title(row['event_content']),
-                        "start": iso_start,
-                        "end": iso_end,
-                        "backgroundColor": color,
-                        "borderColor": color,
-                        "allDay": False
-                    })
-                except:
-                    continue
-
-            # --- CẤU HÌNH FULLCALENDAR ---
-            calendar_options = {
-                "headerToolbar": {
-                    "left": "prev,next today",
-                    "center": "title",
-                    "right": "dayGridMonth,timeGridWeek,listWeek"
-                },
-                "initialView": "dayGridMonth",
-                
-                # [QUAN TRỌNG NHẤT] Thêm dòng này để biến "Dấu chấm" thành "Khối màu"
-                "eventDisplay": "block",
-                
-                "height": "auto", 
-                "slotMinTime": "00:00:00",
-                "slotMaxTime": "23:00:00",
-                "allDaySlot": False,
-                "slotEventOverlap": False,
-                
-                "buttonText": {
-                    "today": "Hôm nay", "month": "Tháng", "week": "Tuần", "list": "Danh sách"
-                },
-                "slotLabelFormat": {
-                    "hour": "2-digit", "minute": "2-digit", "hour12": False, "meridiem": False
-                },
-                "eventTimeFormat": {
-                    "hour": "2-digit", "minute": "2-digit", "hour12": False
-                }
+            # [FIX] Đổi tên All Day và Format 24h
+            "allDayText": "All Day",
+            "slotLabelFormat": {
+                "hour": "2-digit", "minute": "2-digit", "hour12": False, "meridiem": False
+            },
+            "eventTimeFormat": {
+                "hour": "2-digit", "minute": "2-digit", "hour12": False
             }
-            
-            # CSS DARK MODE (Đã chỉnh lại để không bị mất màu)
-            custom_css = """
-                .fc {
-                    background-color: #0E1117; 
-                    font-family: sans-serif;
-                }
-                .fc-col-header-cell-cushion {
-                    color: #E0E0E0 !important;
-                    font-size: 1.1em;
-                    font-weight: 600;
-                    padding: 10px 0 !important;
-                }
-                .fc-daygrid-day-number {
-                    color: #E0E0E0 !important;
-                    font-weight: 500;
-                    padding: 8px !important;
-                }
-                /* Kẻ bảng màu xám nhẹ để thấy rõ ô */
-                .fc-theme-standard td, .fc-theme-standard th {
-                    border-color: #303030 !important;
-                }
-                .fc-event {
-                    border-radius: 4px !important;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
-                    border: none !important;
-                    margin: 2px !important;
-                    cursor: pointer;
-                }
-                .fc-toolbar-title {
-                    color: white !important;
-                    text-transform: capitalize !important;
-                }
-                .fc-button {
-                    background-color: #262730 !important;
-                    border: 1px solid #4a4a4a !important;
-                    color: white !important;
-                    text-transform: capitalize !important;
-                }
-                .fc-button-active {
-                    background-color: #FF4B4B !important;
-                    border-color: #FF4B4B !important;
-                }
-            """
+        }
 
-            # Bỏ st.container bao ngoài -> Để Calendar tự do bung lụa
-            calendar(
-                events=calendar_events, 
-                options=calendar_options, 
-                custom_css=custom_css,
-                key="final_calendar_v3" # Key mới để reset lại từ đầu
-            )
+        custom_css = """
+            .fc {
+                font-family: 'Segoe UI', sans-serif;
+                background-color: #1E1E1E;
+                color: #FFFFFF;
+            }
+            .fc-scrollgrid {
+                border: 1px solid #444 !important;
+                border-radius: 12px !important;
+                overflow: hidden;
+            }
+            .fc-theme-standard td, .fc-theme-standard th {
+                border-color: #383838 !important;
+            }
+            .fc-col-header-cell {
+                background-color: #2D2D2D;
+                padding: 12px 0 !important;
+            }
+            .fc-col-header-cell-cushion {
+                color: #FF4B4B !important;
+                font-weight: 700;
+                text-transform: uppercase;
+                font-size: 0.9rem;
+            }
+            .fc-button {
+                background-color: #2D2D2D !important;
+                border: 1px solid #444 !important;
+                text-transform: capitalize !important;
+                font-weight: 600 !important;
+                border-radius: 8px !important;
+                padding: 6px 16px !important;
+                box-shadow: none !important;
+            }
+            .fc-button:hover { background-color: #3E3E3E !important; }
+            .fc-button-active {
+                background-color: #FF4B4B !important;
+                border-color: #FF4B4B !important;
+                color: white !important;
+            }
+            .fc-toolbar-title { font-size: 1.5rem !important; font-weight: 700; color: white; }
+            .fc-day-today { background-color: rgba(255, 75, 75, 0.08) !important; }
+            .fc-event {
+                border-radius: 4px !important;
+                padding: 2px 4px;
+                font-size: 0.85rem;
+                border: none !important;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            }
+        """
 
+        calendar(events=calendar_events, options=calendar_options, custom_css=custom_css, key="cal_v_final")
+
+    else:
+        st.markdown("### 📝 Danh sách sự kiện")
+        if df_events.empty:
+            st.info("Chưa có sự kiện nào.")
         else:
-            # --- CHẾ ĐỘ DANH SÁCH ---
-            st.markdown("### 📝 Chi tiết lịch trình")
             for _, row in df_events.iterrows():
                 event_dt = pd.to_datetime(row['start_time'])
-                clean_content = row['event_content'].replace("'", "").replace('"', "").strip()
-                clean_content = clean_content[0].upper() + clean_content[1:] if clean_content else ""
+                is_all_day_db = bool(row.get('is_all_day', 0))
+                time_display = "🟦 Cả ngày" if is_all_day_db else f"🕒 {event_dt.strftime('%H:%M')}"
                 
                 st.markdown(f"""
-                <div style="background-color: #262730; padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #FF4B4B;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <strong style="color: white; font-size: 1.1em;">{clean_content}</strong>
-                        <span style="color: #FFBD45; font-weight: bold;">{event_dt.strftime('%H:%M')}</span>
+                <div style="background-color: #262730; padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-size: 1.1em; font-weight: bold; color: #FFF; margin-bottom: 4px;">{row['event_content']}</div>
+                        <div style="color: #AAA; font-size: 0.9em;">📍 {row['location']}</div>
                     </div>
-                    <div style="color: #A0A0A0; font-size: 0.9em; margin-top: 4px;">
-                        📅 {event_dt.strftime('%d/%m/%Y')} &nbsp; | &nbsp; 📍 {row['location']}
+                    <div style="text-align: right;">
+                        <div style="color: #FF4B4B; font-weight: bold;">{event_dt.strftime('%d/%m/%Y')}</div>
+                        <div style="color: #FFBD45; font-size: 0.9em;">{time_display}</div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
-# --- TAB 3: QUẢN LÝ & DANH SÁCH ---
+# --- TAB 3: QUẢN LÝ ---
 with tab3:
-    st.subheader("Danh sách chi tiết & Chỉnh sửa")
-    
-    search_term = st.text_input("🔍 Tìm kiếm sự kiện:", placeholder="Nhập từ khóa...")
-    df = db.get_all_events()
-    if search_term:
-        df = df[df['event_content'].str.contains(search_term, case=False) | df['location'].str.contains(search_term, case=False)]
-
-    st.dataframe(
-        df,
-        column_config={
-            "id": "ID",
-            "event_content": "Sự kiện",
-            "start_time": "Thời gian",
-            "location": "Địa điểm",
-            "reminder_minutes": "Nhắc trước (phút)"
-        },
-        hide_index=True,
-        height=300
-    )
-
-    st.divider()
-    st.warning("⚠️ Khu vực chỉnh sửa (Nhập ID)")
-    
-    col_select, col_action = st.columns([1, 2])
-    with col_select:
-        event_id_input = st.number_input("ID sự kiện:", min_value=0, step=1)
-        
-    if event_id_input > 0:
-        event_data = db.get_event_by_id(event_id_input)
-        if event_data is not None:
-            with st.form("edit_form"):
-                st.write(f"Đang sửa: **{event_data['event_content']}**")
-                
-                new_content = st.text_input("Tên sự kiện", value=event_data['event_content'])
-                new_location = st.text_input("Địa điểm", value=event_data['location'])
-                
-                try:
-                    current_time = pd.to_datetime(event_data['start_time'])
-                    new_date = st.date_input("Ngày", value=current_time.date())
-                    new_time = st.time_input("Giờ", value=current_time.time())
-                except:
-                    pass
-                
-                new_reminder = st.number_input("Nhắc trước (phút)", value=event_data['reminder_minutes'])
-                
-                c1, c2 = st.columns(2)
-                with c1:
-                    btn_update = st.form_submit_button("💾 Lưu", type="primary")
-                with c2:
-                    btn_delete = st.form_submit_button("🗑️ Xóa", type="secondary")
-                
-                if btn_update:
-                    final_dt = datetime.combine(new_date, new_time)
-                    db.update_event(event_id_input, new_content, new_location, final_dt.isoformat(), new_reminder)
-                    st.toast("Đã cập nhật!")
-                    time.sleep(1)
-                    st.rerun()
-                    
-                if btn_delete:
-                    db.delete_event(event_id_input)
-                    st.toast("Đã xóa!")
-                    time.sleep(1)
-                    st.rerun()
+    st.subheader("🛠️ Công cụ quản lý")
+    c_export, c_search = st.columns([1, 2])
+    with c_export:
+        all_events = db.get_all_events()
+        if not all_events.empty:
+            st.download_button("📥 Tải về Backup (.json)", data=all_events.to_json(orient='records', force_ascii=False, indent=2), file_name="schedule_backup.json", mime="application/json", width='stretch')
         else:
-            st.error("Không tìm thấy ID này!")
+            st.button("📥 Tải về", disabled=True, width='stretch')
+            
+    with c_search: search_term = st.text_input("🔍 Tìm kiếm sự kiện:", label_visibility="collapsed", placeholder="Nhập từ khóa để lọc...")
+    
+    if search_term and not all_events.empty:
+        all_events = all_events[all_events['event_content'].str.contains(search_term, case=False) | all_events['location'].str.contains(search_term, case=False)]
+
+    if not all_events.empty:
+        st.dataframe(all_events, hide_index=True, width='stretch', height=250)
+    
+    st.markdown("---")
+    st.write("#### ✏️ Chỉnh sửa nhanh")
+    event_id_input = st.number_input("Nhập ID sự kiện cần sửa:", min_value=0, step=1)
+    
+    if event_id_input > 0:
+        evt = db.get_event_by_id(event_id_input)
+        if evt is not None:
+            with st.expander("Mở form chỉnh sửa", expanded=True):
+                with st.form("edit_form"):
+                    st.info(f"Đang sửa ID: {event_id_input}")
+                    st.text_area("Câu lệnh gốc:", value=evt['original_text'], height=60, disabled=True)
+                    
+                    c_name, c_loc = st.columns(2)
+                    new_content = c_name.text_input("Tên sự kiện", value=evt['event_content'])
+                    new_loc = c_loc.text_input("Địa điểm", value=evt['location'])
+                    
+                    # Logic All Day
+                    current_is_all_day = bool(evt.get('is_all_day', 0))
+                    new_is_all_day = st.checkbox("Sự kiện diễn ra cả ngày?", value=current_is_all_day)
+
+                    try:
+                        # Lấy start_time và end_time hiện tại từ DB
+                        cur_start = pd.to_datetime(evt['start_time'])
+                        if evt['end_time']:
+                            cur_end = pd.to_datetime(evt['end_time'])
+                        else:
+                            cur_end = cur_start + timedelta(hours=1)
+
+                        # [FIX] Tách 2 ô nhập giờ: Bắt đầu & Kết thúc
+                        c_date, c_start, c_end, c_rem = st.columns(4)
+                        new_date = c_date.date_input("Ngày", value=cur_start.date())
+                        new_start_time = c_start.time_input("Giờ bắt đầu", value=cur_start.time(), disabled=new_is_all_day)
+                        new_end_time = c_end.time_input("Giờ kết thúc", value=cur_end.time(), disabled=new_is_all_day)
+                        new_rem = c_rem.number_input("Nhắc trước (phút)", value=evt['reminder_minutes'])
+                    except: pass
+                    
+                    if st.form_submit_button("💾 Lưu thay đổi", type="primary", width='stretch'):
+                        # Logic lưu
+                        if new_is_all_day:
+                            final_start_dt = datetime.combine(new_date, datetime.min.time()) # 00:00
+                            final_end_dt = final_start_dt + timedelta(days=1)
+                        else:
+                            final_start_dt = datetime.combine(new_date, new_start_time)
+                            final_end_dt = datetime.combine(new_date, new_end_time)
+                            
+                            # Tự động sửa nếu Giờ kết thúc <= Giờ bắt đầu
+                            if final_end_dt <= final_start_dt:
+                                final_end_dt = final_start_dt + timedelta(hours=1)
+
+                        db.update_event(event_id_input, new_content, new_loc, final_start_dt.isoformat(), final_end_dt.isoformat(), new_rem, new_is_all_day)
+                        st.toast("Đã lưu thành công!")
+                        time.sleep(1)
+                        st.rerun()
+                        
+                    if st.form_submit_button("🗑️ Xóa sự kiện vĩnh viễn", type="secondary", width='stretch'):
+                        db.delete_event(event_id_input)
+                        st.toast("Đã xóa!")
+                        time.sleep(1)
+                        st.rerun()
