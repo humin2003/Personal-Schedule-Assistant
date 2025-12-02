@@ -31,6 +31,11 @@ from src.database import DatabaseManager
 # --- INIT STATE ---
 if 'db' not in st.session_state: st.session_state.db = DatabaseManager()
 if 'nlp' not in st.session_state: st.session_state.nlp = NLPEngine()
+
+# [MỚI] Biến để lưu trạng thái chờ xác nhận
+if 'confirm_mode' not in st.session_state: st.session_state.confirm_mode = False
+if 'pending_event_data' not in st.session_state: st.session_state.pending_event_data = None
+
 db = st.session_state.db
 nlp = st.session_state.nlp
 
@@ -74,10 +79,26 @@ with tab1:
         raw_text = st.session_state.input_main
         if raw_text.strip():
             try:
+                # 1. Xử lý NLP
                 data = nlp.process(raw_text)
-                db.add_event(data)
-                st.toast(f"✅ Đã thêm: {data['event']}", icon="🎉")
-                st.session_state.input_main = ""
+                
+                # 2. Kiểm tra quá khứ
+                start_dt = datetime.fromisoformat(data['start_time'])
+                now = datetime.now()
+                
+                # Logic: Nếu không phải cả ngày VÀ ở quá khứ -> BẬT CHẾ ĐỘ XÁC NHẬN
+                if not data.get('is_all_day') and start_dt < now:
+                    st.session_state.confirm_mode = True        # Bật cờ xác nhận
+                    st.session_state.pending_event_data = data  # Lưu tạm dữ liệu
+                    st.session_state.input_main = ""            # Xóa ô nhập cho gọn
+                    
+                else:
+                    # Nếu là tương lai -> Thêm luôn như bình thường
+                    db.add_event(data)
+                    st.toast(f"✅ Đã thêm: {data['event']}", icon="🎉")
+                    st.session_state.input_main = ""
+                    st.session_state.confirm_mode = False # Reset cờ
+                    
             except ValueError as e:
                 st.toast(f"❌ Lỗi: {str(e)}", icon="⚠️")
 
@@ -88,6 +109,40 @@ with tab1:
         st.write("")
         st.button("✨ Thêm ngay", type="primary", on_click=handle_add_event, width='stretch')
 
+    # --- [MỚI] GIAO DIỆN XÁC NHẬN (Hiện ra khi cần confirm) ---
+    if st.session_state.confirm_mode and st.session_state.pending_event_data:
+        pending_data = st.session_state.pending_event_data
+        start_time_str = datetime.fromisoformat(pending_data['start_time']).strftime('%H:%M %d/%m/%Y')
+        
+        # Hiện khung cảnh báo màu vàng
+        with st.container(border=True):
+            st.warning(f"⚠️ **Xác nhận:** Sự kiện **'{pending_data['event']}'** diễn ra lúc **{start_time_str}** (Quá khứ).")
+            st.write("Bạn có chắc chắn muốn thêm không?")
+            
+            col_yes, col_no = st.columns(2)
+            
+            # Nút ĐỒNG Ý
+            if col_yes.button("Có", width='stretch'):
+                db.add_event(pending_data) # Thêm vào DB từ biến tạm
+                st.toast(f"Đã thêm sự kiện: {pending_data['event']}",)
+                time.sleep(1)
+                
+                # Reset trạng thái
+                st.session_state.confirm_mode = False
+                st.session_state.pending_event_data = None
+                st.rerun() # Chạy lại để ẩn khung xác nhận
+            
+            # Nút HỦY
+            if col_no.button("Không, hủy bỏ", width='stretch'):
+                st.toast("Đã hủy thao tác!")
+                time.sleep(1)
+                
+                # Reset trạng thái
+                st.session_state.confirm_mode = False
+                st.session_state.pending_event_data = None
+                st.rerun()
+        
+        
     st.write("")
     st.markdown("##### 🕒 Sự kiện sắp tới")
     df_preview = db.get_all_events().head(5)
@@ -235,81 +290,130 @@ with tab2:
                 </div>
                 """, unsafe_allow_html=True)
 
-# --- TAB 3: QUẢN LÝ ---
+# --- TAB 3: QUẢN LÝ & IMPORT/EXPORT ---
+# --- TAB 3: QUẢN LÝ & IMPORT/EXPORT ---
 with tab3:
-    st.subheader("🛠️ Công cụ quản lý")
-    c_export, c_search = st.columns([1, 2])
-    with c_export:
+    st.subheader("🛠️ Công cụ quản lý dữ liệu")
+    
+    col_backup, col_restore = st.columns(2)
+    
+    # --- 1. XUẤT DỮ LIỆU ---
+    with col_backup:
+        st.markdown("#### 📤 Sao lưu dữ liệu")
+        st.caption("Xuất toàn bộ lịch trình ra file JSON.")
+        
         all_events = db.get_all_events()
         if not all_events.empty:
-            st.download_button("📥 Tải về Backup (.json)", data=all_events.to_json(orient='records', force_ascii=False, indent=2), file_name="schedule_backup.json", mime="application/json", width='stretch')
+            json_str = all_events.to_json(orient='records', force_ascii=False, indent=2)
+            st.download_button("📥 Tải file Backup (.json)", json_str, "schedule_backup.json", "application/json", width='stretch')
         else:
-            st.button("📥 Tải về", disabled=True, width='stretch')
-            
-    with c_search: search_term = st.text_input("🔍 Tìm kiếm sự kiện:", label_visibility="collapsed", placeholder="Nhập từ khóa để lọc...")
-    
-    if search_term and not all_events.empty:
-        all_events = all_events[all_events['event_content'].str.contains(search_term, case=False) | all_events['location'].str.contains(search_term, case=False)]
+            st.info("Chưa có dữ liệu.")
 
-    if not all_events.empty:
-        st.dataframe(all_events, hide_index=True, width='stretch', height=250)
-    
+    # --- 2. NHẬP DỮ LIỆU (RESTORE - FIX) ---
+    with col_restore:
+        st.markdown("#### 📥 Khôi phục dữ liệu")
+        st.caption("Nhập file JSON để thêm lại sự kiện.")
+        
+        uploaded_file = st.file_uploader("Chọn file .json", type=['json'], label_visibility="collapsed")
+        
+        if uploaded_file is not None:
+            if st.button("🚀 Bắt đầu Import", type="primary", width='stretch'):
+                try:
+                    df_new = pd.read_json(uploaded_file)
+                    
+                    if df_new.empty:
+                        st.warning("File rỗng!")
+                    else:
+                        success_count = 0
+                        for _, row in df_new.iterrows():
+                            # [FIX 1] Xử lý lỗi Timestamp
+                            s_time = row.get('start_time')
+                            e_time = row.get('end_time')
+                            if isinstance(s_time, pd.Timestamp): s_time = s_time.isoformat()
+                            if isinstance(e_time, pd.Timestamp): e_time = e_time.isoformat()
+
+                            # [FIX 2] Xử lý original_text bị mất hoặc thành số 0
+                            raw_text = row.get('original_text', '')
+                            # Nếu là số 0 hoặc NaN -> chuyển thành chuỗi rỗng
+                            if pd.isna(raw_text) or str(raw_text) == '0': 
+                                raw_text = ""
+                            else:
+                                raw_text = str(raw_text)
+
+                            # Mapping dữ liệu
+                            event_data = {
+                                "event": row.get('event_content', 'Sự kiện Import'),
+                                "start_time": s_time,
+                                "end_time": e_time,
+                                "location": row.get('location', ''),
+                                "reminder_minutes": row.get('reminder_minutes', 0),
+                                "is_all_day": row.get('is_all_day', 0),
+                                "original_text": raw_text # <-- Đã xử lý sạch
+                            }
+                            db.add_event(event_data)
+                            success_count += 1
+                        
+                        st.success(f"✅ Đã khôi phục {success_count} sự kiện!")
+                        time.sleep(1.5)
+                        st.rerun()
+                        
+                except Exception as e:
+                    st.error(f"❌ Lỗi: {e}")
+
     st.markdown("---")
-    st.write("#### ✏️ Chỉnh sửa nhanh")
-    event_id_input = st.number_input("Nhập ID sự kiện cần sửa:", min_value=0, step=1)
     
+    # --- 3. BẢNG DỮ LIỆU ---
+    st.markdown("### 🔍 Dữ liệu hiện tại")
+    all_events = db.get_all_events()
+    st.dataframe(all_events, width='stretch', height=300, hide_index=True)
+
+    # --- 4. FORM SỬA (Logic cũ giữ nguyên hoặc copy lại nếu cần) ---
+    # (Bạn giữ nguyên phần code sửa/xóa bên dưới của mình nhé)
+    st.write("#### ✏️ Chỉnh sửa theo ID")
+    event_id_input = st.number_input("Nhập ID sự kiện:", min_value=0, step=1)
     if event_id_input > 0:
         evt = db.get_event_by_id(event_id_input)
         if evt is not None:
-            with st.expander("Mở form chỉnh sửa", expanded=True):
+            with st.expander(f"Sửa ID: {event_id_input}", expanded=True):
                 with st.form("edit_form"):
-                    st.info(f"Đang sửa ID: {event_id_input}")
-                    st.text_area("Câu lệnh gốc:", value=evt['original_text'], height=60, disabled=True)
+                    # Hiển thị text gốc
+                    st.text_area("Câu lệnh gốc:", value=evt['original_text'], disabled=True)
                     
-                    c_name, c_loc = st.columns(2)
-                    new_content = c_name.text_input("Tên sự kiện", value=evt['event_content'])
-                    new_loc = c_loc.text_input("Địa điểm", value=evt['location'])
+                    c1, c2 = st.columns(2)
+                    new_content = c1.text_input("Tên sự kiện", value=evt['event_content'])
+                    new_loc = c2.text_input("Địa điểm", value=evt['location'])
                     
-                    # Logic All Day
-                    current_is_all_day = bool(evt.get('is_all_day', 0))
-                    new_is_all_day = st.checkbox("Sự kiện diễn ra cả ngày?", value=current_is_all_day)
-
+                    is_all_day = st.checkbox("Cả ngày?", value=bool(evt.get('is_all_day', 0)))
+                    
+                    # Xử lý datetime để hiển thị lên form
                     try:
-                        # Lấy start_time và end_time hiện tại từ DB
                         cur_start = pd.to_datetime(evt['start_time'])
-                        if evt['end_time']:
-                            cur_end = pd.to_datetime(evt['end_time'])
-                        else:
-                            cur_end = cur_start + timedelta(hours=1)
-
-                        # [FIX] Tách 2 ô nhập giờ: Bắt đầu & Kết thúc
-                        c_date, c_start, c_end, c_rem = st.columns(4)
-                        new_date = c_date.date_input("Ngày", value=cur_start.date())
-                        new_start_time = c_start.time_input("Giờ bắt đầu", value=cur_start.time(), disabled=new_is_all_day)
-                        new_end_time = c_end.time_input("Giờ kết thúc", value=cur_end.time(), disabled=new_is_all_day)
-                        new_rem = c_rem.number_input("Nhắc trước (phút)", value=evt['reminder_minutes'])
+                        cur_end = pd.to_datetime(evt['end_time']) if evt['end_time'] else cur_start + timedelta(hours=1)
+                        
+                        d_col, t1_col, t2_col, rem_col = st.columns(4)
+                        new_date = d_col.date_input("Ngày", value=cur_start.date())
+                        new_start = t1_col.time_input("Bắt đầu", value=cur_start.time(), disabled=is_all_day)
+                        new_end = t2_col.time_input("Kết thúc", value=cur_end.time(), disabled=is_all_day)
+                        new_rem = rem_col.number_input("Nhắc trước (phút)", value=evt['reminder_minutes'])
                     except: pass
-                    
-                    if st.form_submit_button("💾 Lưu thay đổi", type="primary", width='stretch'):
-                        # Logic lưu
-                        if new_is_all_day:
-                            final_start_dt = datetime.combine(new_date, datetime.min.time()) # 00:00
-                            final_end_dt = final_start_dt + timedelta(days=1)
-                        else:
-                            final_start_dt = datetime.combine(new_date, new_start_time)
-                            final_end_dt = datetime.combine(new_date, new_end_time)
-                            
-                            # Tự động sửa nếu Giờ kết thúc <= Giờ bắt đầu
-                            if final_end_dt <= final_start_dt:
-                                final_end_dt = final_start_dt + timedelta(hours=1)
 
-                        db.update_event(event_id_input, new_content, new_loc, final_start_dt.isoformat(), final_end_dt.isoformat(), new_rem, new_is_all_day)
-                        st.toast("Đã lưu thành công!")
+                    if st.form_submit_button("💾 Lưu thay đổi", type="primary", width='stretch'):
+                        # Logic lưu thời gian
+                        if is_all_day:
+                            s_dt = datetime.combine(new_date, datetime.min.time())
+                            e_dt = s_dt + timedelta(days=1)
+                        else:
+                            s_dt = datetime.combine(new_date, new_start)
+                            e_dt = datetime.combine(new_date, new_end)
+                            if e_dt <= s_dt: e_dt = s_dt + timedelta(hours=1)
+                        
+                        db.update_event(event_id_input, new_content, new_loc, s_dt.isoformat(), e_dt.isoformat(), new_rem, is_all_day)
+                        st.toast("Đã lưu!", icon="💾")
                         time.sleep(1)
                         st.rerun()
-                        
-                    if st.form_submit_button("🗑️ Xóa sự kiện vĩnh viễn", type="secondary", width='stretch'):
+
+                    if st.form_submit_button("🗑️ Xóa", type="secondary", width='stretch'):
                         db.delete_event(event_id_input)
-                        st.toast("Đã xóa!")
+                        st.toast("Đã xóa!", icon="🗑️")
                         time.sleep(1)
                         st.rerun()

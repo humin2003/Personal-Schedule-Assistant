@@ -30,7 +30,15 @@ class DatabaseManager:
         """
         with self.get_connection() as conn:
             conn.execute(query)
-            try: conn.execute("ALTER TABLE events ADD COLUMN is_all_day INTEGER DEFAULT 0")
+            
+            # 2. [FIX] Tự động thêm các cột thiếu (cho DB cũ)
+            try: 
+                conn.execute("ALTER TABLE events ADD COLUMN is_all_day INTEGER DEFAULT 0")
+            except: pass
+            
+            try: 
+                # Thêm cột original_text nếu thiếu, mặc định là chuỗi rỗng
+                conn.execute("ALTER TABLE events ADD COLUMN original_text TEXT DEFAULT ''")
             except: pass
 
     def add_event(self, data: dict):
