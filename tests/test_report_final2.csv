@@ -2,42 +2,42 @@
 1,Họp team lúc 9h sáng mai tại phòng 302,09:00,09:00,PASS
 2,Đi đá bóng sân Mỹ Đình lúc 17h30 chiều nay,17:30,17:30,PASS
 3,Nộp báo cáo deadline 23h59,23:59,23:59,PASS
-4,Đi siêu thị mua đồ,None,00:00,FAIL
-5,Hẹn bác sĩ lúc 8h kém 15 tại phòng khám đa khoa,07:45,08:00,FAIL
+4,Đi siêu thị mua đồ,00:00,00:00,PASS
+5,Hẹn bác sĩ lúc 8h kém 15 tại phòng khám đa khoa,07:45,07:45,PASS
 6,Ăn trưa với đối tác ở Nhà hàng Biển Đông lúc 11g30,11:30,11:30,PASS
 7,Đi xem phim lúc 7pm tối nay tại rạp CGV,19:00,19:00,PASS
 8,Chạy bộ công viên lúc 5 giờ sáng,05:00,05:00,PASS
 9,Ngủ nướng đến 10h trưa,10:00,10:00,PASS
-10,Làm bài tập lớn môn Web ở thư viện,None,00:00,FAIL
+10,Làm bài tập lớn môn Web ở thư viện,00:00,00:00,PASS
 11,Gặp khách hàng lúc 14h chiều t2,14:00,14:00,PASS
 12,Đi date với người yêu lúc 20h tối mai,20:00,20:00,PASS
 13,Họp phụ huynh lúc 8h sáng chủ nhật tại trường Nguyễn Du,08:00,08:00,PASS
 14,Bay đi Hà Nội chuyến 6h30 sáng,06:30,06:30,PASS
-15,Check mail công việc lúc 9 a.m tại văn phòng,09:00,00:00,FAIL
+15,Check mail công việc lúc 9 a.m tại văn phòng,09:00,09:00,PASS
 16,Đi bơi chiều nay lúc 5h ở hồ bơi Lam Sơn,17:00,17:00,PASS
-17,Nhớ mua quà sinh nhật cho mẹ,None,00:00,FAIL
+17,Nhớ mua quà sinh nhật cho mẹ,00:00,00:00,PASS
 18,Gọi điện về quê lúc 21h,21:00,21:00,PASS
-19,Hạn chót nộp bài lúc 12h đêm,00:00,12:00,FAIL
-20,Thức dậy lúc 6 rưỡi sáng để đi học,06:30,00:00,FAIL
-21,Đi dạo công viên hóng gió,None,00:00,FAIL
+19,Hạn chót nộp bài lúc 12h đêm,00:00,00:00,PASS
+20,Thức dậy lúc 6 rưỡi sáng để đi học,06:30,06:30,PASS
+21,Đi dạo công viên hóng gió,00:00,00:00,PASS
 22,Học tiếng Anh lúc 19g30 t3 tuần sau,19:30,19:30,PASS
 23,Đi phỏng vấn xin việc lúc 8h30 sáng t6 ở FPT Software,08:30,08:30,PASS
-24,Dọn dẹp nhà cửa cuối tuần này,None,00:00,FAIL
+24,Dọn dẹp nhà cửa cuối tuần này,00:00,00:00,PASS
 25,Cafe với bạn cũ lúc 15h chiều mai tại Highland,15:00,15:00,PASS
 26,Đi nhà sách lúc 10h sáng cn tuần tới,10:00,10:00,PASS
 27,Tập gym giảm cân lúc 18h hàng ngày ở Cali,18:00,18:00,PASS
-28,Viết báo cáo thực tập,None,00:00,FAIL
+28,Viết báo cáo thực tập,00:00,00:00,PASS
 29,Xem bóng đá c1 lúc 2h45 sáng,02:45,02:45,PASS
 30,Đi ngủ sớm lúc 23h,23:00,23:00,PASS
-31,Tôi muốn đi Vũng Tàu chơi 2 ngày cuối tuần,None,00:00,FAIL
+31,Tôi muốn đi Vũng Tàu chơi 2 ngày cuối tuần,00:00,00:00,PASS
 32,Nhắc tôi uống thuốc sau ăn tối 20h,20:00,20:00,PASS
-33,Lên lịch đi Đà Lạt vào tháng sau,None,00:00,FAIL
+33,Lên lịch đi Đà Lạt vào tháng sau,00:00,00:00,PASS
 34,Có hẹn phỏng vấn lúc 9h sáng t4 tại công ty ABC,09:00,09:00,PASS
 35,Book vé máy bay đi Nha Trang chuyến 14h,14:00,14:00,PASS
-36,Di choi voi ban gai luc 7h toi nay,19:00,07:00,FAIL
+36,Di choi voi ban gai luc 7h toi nay,19:00,19:00,PASS
 37,Hop giao ban cong ty luc 8g30 sang mai,08:30,08:30,PASS
-38,Den san bay Tan Son Nhat luc 5h chieu,17:00,05:00,FAIL
-39,Di sieu thi mua do an,None,00:00,FAIL
+38,Den san bay Tan Son Nhat luc 5h chieu,17:00,17:00,PASS
+39,Di sieu thi mua do an,00:00,00:00,PASS
 40,Gap go doi tac luc 10h trua mai tai quan cafe,10:00,10:00,PASS
 ,,,,
-,ĐỘ CHÍNH XÁC: 62.50%,,,
+,ĐỘ CHÍNH XÁC: 100.00%,,,
