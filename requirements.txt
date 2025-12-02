@@ -1,6 +1,8 @@
+streamlit
+streamlit-calendar
+pandas
 underthesea
 python-dateutil
 plyer
-streamlit
-streamlit-calendar
 winotify
+pyinstaller

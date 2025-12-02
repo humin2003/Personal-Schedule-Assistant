@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from streamlit_calendar import calendar
 
 # --- CONFIG ---
-st.set_page_config(page_title="Trợ lý Lịch trình AI", page_icon="📅", layout="wide")
+st.set_page_config(page_title="Trợ lý Lịch trình AI", layout="wide")
 
 # Thử import notification
 try:
@@ -55,7 +55,7 @@ def run_scheduler():
                 start_dt = datetime.fromisoformat(start_str)
                 rem_time = start_dt - timedelta(minutes=rem_min)
                 if rem_time <= now <= rem_time + timedelta(seconds=59):
-                     notification.notify(title=f"🔔 Lời nhắc: {event_content}", message=f"Lúc {start_dt.strftime('%H:%M')} tại {loc}", app_name="Lời nhắc", timeout=10)
+                     notification.notify(title=f"Lời nhắc: {event_content}", message=f"Lúc {start_dt.strftime('%H:%M')} tại {loc}", app_name="Lời nhắc", timeout=10)
             conn.close()
         except Exception: pass
         time.sleep(60)
@@ -65,14 +65,14 @@ if 'scheduler_started' not in st.session_state:
     st.session_state['scheduler_started'] = True
 
 # --- HEADER ---
-st.title("📅 Trợ lý Quản lý Lịch trình Thông minh")
+st.title("Trợ lý Quản lý Lịch trình Thông minh")
 st.markdown("---")
 
-tab1, tab2, tab3 = st.tabs(["➕ Thêm sự kiện", "🗓️ Xem Lịch Biểu", "⚙️ Quản lý & Xuất file"])
+tab1, tab2, tab3 = st.tabs(["➕ Thêm sự kiện", "Xem Lịch Biểu", "Quản lý & Xuất file"])
 
 # --- TAB 1: THÊM SỰ KIỆN ---
 with tab1:
-    st.subheader("💬 Nhập liệu ngôn ngữ tự nhiên")
+    st.subheader("Nhập liệu ngôn ngữ tự nhiên")
     st.caption("Ví dụ: 'Họp team lúc 9h đến 11h sáng mai ở phòng 302', 'Mai đi chơi cả ngày'")
     
     def handle_add_event():
@@ -95,19 +95,19 @@ with tab1:
                 else:
                     # Nếu là tương lai -> Thêm luôn như bình thường
                     db.add_event(data)
-                    st.toast(f"✅ Đã thêm: {data['event']}", icon="🎉")
+                    st.toast(f"Đã thêm: {data['event']}")
                     st.session_state.input_main = ""
                     st.session_state.confirm_mode = False # Reset cờ
                     
             except ValueError as e:
-                st.toast(f"❌ Lỗi: {str(e)}", icon="⚠️")
+                st.toast(f"Lỗi: {str(e)}")
 
     c1, c2 = st.columns([5, 1])
     with c1: st.text_input("Nhập câu lệnh tại đây:", key="input_main", placeholder="Gõ lệnh và nhấn Enter hoặc nút Thêm...")
     with c2: 
         st.write("")
         st.write("")
-        st.button("✨ Thêm ngay", type="primary", on_click=handle_add_event, width='stretch')
+        st.button("Thêm ngay", type="primary", on_click=handle_add_event, width='stretch')
 
     # --- [MỚI] GIAO DIỆN XÁC NHẬN (Hiện ra khi cần confirm) ---
     if st.session_state.confirm_mode and st.session_state.pending_event_data:
@@ -116,7 +116,7 @@ with tab1:
         
         # Hiện khung cảnh báo màu vàng
         with st.container(border=True):
-            st.warning(f"⚠️ **Xác nhận:** Sự kiện **'{pending_data['event']}'** diễn ra lúc **{start_time_str}** (Quá khứ).")
+            st.warning(f"**Xác nhận:** Sự kiện **'{pending_data['event']}'** diễn ra lúc **{start_time_str}** (Quá khứ).")
             st.write("Bạn có chắc chắn muốn thêm không?")
             
             col_yes, col_no = st.columns(2)
@@ -144,7 +144,7 @@ with tab1:
         
         
     st.write("")
-    st.markdown("##### 🕒 Sự kiện sắp tới")
+    st.markdown("##### Sự kiện sắp tới")
     df_preview = db.get_all_events().head(5)
     if not df_preview.empty:
         st.dataframe(df_preview[['event_content', 'start_time', 'location']], hide_index=True, width='stretch')
@@ -155,9 +155,9 @@ with tab2:
     
     c_view, _ = st.columns([2, 5])
     with c_view:
-        view_mode = st.radio("Chế độ xem:", ["Lịch đồ họa", "Danh sách"], horizontal=True, label_visibility="collapsed", index=0)
+        view_mode = st.radio("Chế độ xem:", ["Lịch biểu", "Danh sách"], horizontal=True, label_visibility="collapsed", index=0)
 
-    if view_mode == "Lịch đồ họa":
+    if view_mode == "Lịch biểu":
         calendar_events = []
         for _, row in df_events.iterrows():
             try:
@@ -268,20 +268,20 @@ with tab2:
         calendar(events=calendar_events, options=calendar_options, custom_css=custom_css, key="cal_v_final")
 
     else:
-        st.markdown("### 📝 Danh sách sự kiện")
+        st.markdown("### Danh sách sự kiện")
         if df_events.empty:
             st.info("Chưa có sự kiện nào.")
         else:
             for _, row in df_events.iterrows():
                 event_dt = pd.to_datetime(row['start_time'])
                 is_all_day_db = bool(row.get('is_all_day', 0))
-                time_display = "🟦 Cả ngày" if is_all_day_db else f"🕒 {event_dt.strftime('%H:%M')}"
+                time_display = "🟦 Cả ngày" if is_all_day_db else f"{event_dt.strftime('%H:%M')}"
                 
                 st.markdown(f"""
                 <div style="background-color: #262730; padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
                     <div>
                         <div style="font-size: 1.1em; font-weight: bold; color: #FFF; margin-bottom: 4px;">{row['event_content']}</div>
-                        <div style="color: #AAA; font-size: 0.9em;">📍 {row['location']}</div>
+                        <div style="color: #AAA; font-size: 0.9em;"> Địa điểm: {row['location']}</div>
                     </div>
                     <div style="text-align: right;">
                         <div style="color: #FF4B4B; font-weight: bold;">{event_dt.strftime('%d/%m/%Y')}</div>
@@ -293,31 +293,31 @@ with tab2:
 # --- TAB 3: QUẢN LÝ & IMPORT/EXPORT ---
 # --- TAB 3: QUẢN LÝ & IMPORT/EXPORT ---
 with tab3:
-    st.subheader("🛠️ Công cụ quản lý dữ liệu")
+    st.subheader("Công cụ quản lý dữ liệu")
     
     col_backup, col_restore = st.columns(2)
     
     # --- 1. XUẤT DỮ LIỆU ---
     with col_backup:
-        st.markdown("#### 📤 Sao lưu dữ liệu")
+        st.markdown("#### Sao lưu dữ liệu")
         st.caption("Xuất toàn bộ lịch trình ra file JSON.")
         
         all_events = db.get_all_events()
         if not all_events.empty:
             json_str = all_events.to_json(orient='records', force_ascii=False, indent=2)
-            st.download_button("📥 Tải file Backup (.json)", json_str, "schedule_backup.json", "application/json", width='stretch')
+            st.download_button("Tải file Backup (.json)", json_str, "schedule_backup.json", "application/json", width='stretch')
         else:
             st.info("Chưa có dữ liệu.")
 
     # --- 2. NHẬP DỮ LIỆU (RESTORE - FIX) ---
     with col_restore:
-        st.markdown("#### 📥 Khôi phục dữ liệu")
+        st.markdown("#### Khôi phục dữ liệu")
         st.caption("Nhập file JSON để thêm lại sự kiện.")
         
         uploaded_file = st.file_uploader("Chọn file .json", type=['json'], label_visibility="collapsed")
         
         if uploaded_file is not None:
-            if st.button("🚀 Bắt đầu Import", type="primary", width='stretch'):
+            if st.button("Bắt đầu Import", type="primary", width='stretch'):
                 try:
                     df_new = pd.read_json(uploaded_file)
                     
@@ -358,18 +358,39 @@ with tab3:
                         st.rerun()
                         
                 except Exception as e:
-                    st.error(f"❌ Lỗi: {e}")
+                    st.error(f"Lỗi: {e}")
 
     st.markdown("---")
+    # --- 3. BẢNG DỮ LIỆU & TÌM KIẾM (Đã nâng cấp) ---
+    st.markdown("### Dữ liệu hiện tại")
     
+    # [MỚI] Thanh tìm kiếm
+    c_search, c_total = st.columns([4, 1])
+    with c_search:
+        search_term = st.text_input("Tìm kiếm nhanh:", placeholder="Nhập tên sự kiện, hoặc địa điểm", label_visibility="collapsed")
+    
+    # Lấy dữ liệu
+    all_events = db.get_all_events()
+    
+    # [LOGIC LỌC]
+    if search_term:
+        # Chuyển từ khóa về chữ thường để tìm không phân biệt hoa/thường
+        term_lower = search_term.lower()
+        
+        # Lọc trên các cột quan trọng
+        filtered_df = all_events[
+            all_events['original_text'].str.lower().str.contains(term_lower, na=False)
+        ]
+    else:
+        filtered_df = all_events
+
     # --- 3. BẢNG DỮ LIỆU ---
-    st.markdown("### 🔍 Dữ liệu hiện tại")
     all_events = db.get_all_events()
     st.dataframe(all_events, width='stretch', height=300, hide_index=True)
 
     # --- 4. FORM SỬA (Logic cũ giữ nguyên hoặc copy lại nếu cần) ---
     # (Bạn giữ nguyên phần code sửa/xóa bên dưới của mình nhé)
-    st.write("#### ✏️ Chỉnh sửa theo ID")
+    st.write("#### Chỉnh sửa theo ID")
     event_id_input = st.number_input("Nhập ID sự kiện:", min_value=0, step=1)
     if event_id_input > 0:
         evt = db.get_event_by_id(event_id_input)
@@ -397,7 +418,7 @@ with tab3:
                         new_rem = rem_col.number_input("Nhắc trước (phút)", value=evt['reminder_minutes'])
                     except: pass
 
-                    if st.form_submit_button("💾 Lưu thay đổi", type="primary", width='stretch'):
+                    if st.form_submit_button("Lưu thay đổi", type="primary", width='stretch'):
                         # Logic lưu thời gian
                         if is_all_day:
                             s_dt = datetime.combine(new_date, datetime.min.time())
@@ -408,12 +429,12 @@ with tab3:
                             if e_dt <= s_dt: e_dt = s_dt + timedelta(hours=1)
                         
                         db.update_event(event_id_input, new_content, new_loc, s_dt.isoformat(), e_dt.isoformat(), new_rem, is_all_day)
-                        st.toast("Đã lưu!", icon="💾")
+                        st.toast("Đã lưu!")
                         time.sleep(1)
                         st.rerun()
 
-                    if st.form_submit_button("🗑️ Xóa", type="secondary", width='stretch'):
+                    if st.form_submit_button("Xóa", type="secondary", width='stretch'):
                         db.delete_event(event_id_input)
-                        st.toast("Đã xóa!", icon="🗑️")
+                        st.toast("Đã xóa!")
                         time.sleep(1)
                         st.rerun()
