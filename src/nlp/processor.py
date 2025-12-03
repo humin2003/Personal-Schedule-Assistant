@@ -1,11 +1,13 @@
 import re
 import unicodedata
 
+# Thêm "tôi muốn", "tôi cần"
 STOP_PHRASES = [
     "nhắc tôi", "nhắc nhở", "hãy nhắc", "nhắc", "đặt lịch", "tạo lịch", 
     "lên lịch", "note lại", "ghi chú", "có hẹn", "việc", "sự kiện",
     "nhac toi", "nhac nho", "hay nhac", "nhac", "dat lich", "tao lich",
-    "len lich", "note lai", "ghi chu", "co hen", "viec", "su kien"
+    "len lich", "note lai", "ghi chu", "co hen", "viec", "su kien",
+    "tôi muốn", "toi muon", "tôi cần", "toi can"
 ]
 
 def normalize_text(text):

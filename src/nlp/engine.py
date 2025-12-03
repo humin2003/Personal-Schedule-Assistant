@@ -1,4 +1,3 @@
-# src/nlp/engine.py
 import re
 from datetime import datetime
 from . import processor, rules, ner, time_parser
@@ -10,33 +9,27 @@ class NLPEngine:
     def process(self, raw_text):
         original_text = raw_text
         
-        # [Component 3] Trích xuất nhắc nhở (Rule-based)
+        # 1. Trích xuất nhắc nhở
         reminder_minutes, clean_text = rules.extract_reminder(raw_text)
         
-        # [Component 1] Tiền xử lý
+        # 2. Tiền xử lý
         clean_text = processor.normalize_text(clean_text)
         
-        # [Component 4] Phân tích thời gian
+        # 3. Time Parser chạy TRƯỚC (Để lọc giờ)
         start_time, end_time, clean_text, has_time, is_all_day = time_parser.extract_datetime(clean_text)
         
-        # [Component 2] Trích xuất địa điểm (NER)
+        # 4. NER chạy SAU (Với bộ lọc thông minh hơn)
         location, clean_text = ner.extract_location(clean_text)
         
-        # Xử lý tên sự kiện
+        # 5. Dọn dẹp tên sự kiện
         clean_text = processor.remove_stop_phrases(clean_text)
         event_name = re.sub(r'\s+', ' ', clean_text).strip(' ,.-')
         if not event_name: event_name = "Sự kiện mới"
 
-        # --- [COMPONENT 5] VALIDATION & HỢP NHẤT ---
-        # 1. Kiểm tra logic thời gian
-        now = datetime.now()
-
-        # Fix lỗi End Time <= Start Time
+        # Validation
         if end_time and end_time <= start_time:
-            # Tự động đẩy End Time lên 1 tiếng
             end_time = start_time.replace(hour=(start_time.hour + 1) % 24)
-            if end_time < start_time: # Qua ngày hôm sau
-                 end_time = end_time.replace(day=start_time.day + 1)
+            if end_time < start_time: end_time = end_time.replace(day=start_time.day + 1)
 
         return {
             "event": event_name.capitalize(),

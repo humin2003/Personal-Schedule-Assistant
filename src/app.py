@@ -8,6 +8,7 @@ import sqlite3
 import json
 from datetime import datetime, timedelta
 from streamlit_calendar import calendar
+import streamlit.components.v1 as components # [MỚI] Thêm thư viện này để hiển thị HTML
 
 # --- CONFIG ---
 st.set_page_config(page_title="Trợ lý Lịch trình AI", layout="wide")
@@ -68,7 +69,8 @@ if 'scheduler_started' not in st.session_state:
 st.title("Trợ lý Quản lý Lịch trình Thông minh")
 st.markdown("---")
 
-tab1, tab2, tab3 = st.tabs(["➕ Thêm sự kiện", "Xem Lịch Biểu", "Quản lý & Xuất file"])
+# [CẬP NHẬT] Thêm Tab 4 vào danh sách
+tab1, tab2, tab3, tab4 = st.tabs(["➕ Thêm sự kiện", "Xem Lịch Biểu", "Quản lý & Xuất file", "📊 Báo cáo Kiểm thử"])
 
 # --- TAB 1: THÊM SỰ KIỆN ---
 with tab1:
@@ -291,7 +293,6 @@ with tab2:
                 """, unsafe_allow_html=True)
 
 # --- TAB 3: QUẢN LÝ & IMPORT/EXPORT ---
-# --- TAB 3: QUẢN LÝ & IMPORT/EXPORT ---
 with tab3:
     st.subheader("Công cụ quản lý dữ liệu")
     
@@ -385,11 +386,9 @@ with tab3:
         filtered_df = all_events
 
     # --- 3. BẢNG DỮ LIỆU ---
-    all_events = db.get_all_events()
-    st.dataframe(all_events, width='stretch', height=300, hide_index=True)
+    st.dataframe(filtered_df, width='stretch', height=300, hide_index=True)
 
     # --- 4. FORM SỬA (Logic cũ giữ nguyên hoặc copy lại nếu cần) ---
-    # (Bạn giữ nguyên phần code sửa/xóa bên dưới của mình nhé)
     st.write("#### Chỉnh sửa theo ID")
     event_id_input = st.number_input("Nhập ID sự kiện:", min_value=0, step=1)
     if event_id_input > 0:
@@ -438,3 +437,151 @@ with tab3:
                         st.toast("Đã xóa!")
                         time.sleep(1)
                         st.rerun()
+
+# --- TAB 4: BÁO CÁO KIỂM THỬ (DASHBOARD) ---
+with tab4:
+    st.header("📊 NLP Accuracy Dashboard")
+    st.caption("Tải lên file `test_report.csv` để xem kết quả kiểm thử.")
+    
+    uploaded_report = st.file_uploader("Chọn file CSV:", type=['csv'], label_visibility="collapsed")
+    json_data = "[]" 
+
+    if uploaded_report is not None:
+        try:
+            # 1. Đọc file thông minh (tự nhận diện dấu phẩy/chấm phẩy)
+            df_report = pd.read_csv(uploaded_report, encoding='utf-8-sig', sep=None, engine='python')
+            
+            # Chuẩn hóa tên cột (về chữ thường, xóa khoảng trắng)
+            df_report.columns = df_report.columns.str.strip()
+            # Mapping tên cột linh hoạt
+            cols = {c.lower(): c for c in df_report.columns}
+            
+            # Tìm cột ID (ưu tiên 'id', 'ID')
+            id_col = cols.get('id')
+            
+            if id_col is None:
+                st.error(f"❌ Không tìm thấy cột ID. Các cột có trong file: {list(df_report.columns)}")
+            else:
+                st.success(f"Đã tải: {uploaded_report.name} ({len(df_report)} dòng)")
+                
+                mapped_data = []
+                for _, row in df_report.iterrows():
+                    row_id = row[id_col]
+                    
+                    # Bỏ qua dòng tổng kết
+                    if pd.isna(row_id) or str(row_id).strip().upper().startswith('ACCURACY'): continue
+                    
+                    # Helper tìm giá trị từ nhiều tên cột khác nhau (Tiếng Anh/Việt)
+                    def get_val(keys):
+                        for k in keys:
+                            if k.lower() in cols: return row[cols[k.lower()]]
+                        return ""
+
+                    mapped_data.append({
+                        "id": row_id,
+                        "text": get_val(['Input', 'Câu lệnh (Input)', 'text']),
+                        "expected_time": get_val(['Exp Time', 'Expected Time', 'Mong đợi', 'expected_time']),
+                        "actual_time": get_val(['Act Time', 'Actual Time', 'Thực tế', 'actual_time']),
+                        "expected_loc": get_val(['Exp Loc', 'Expected Loc', 'Expected Location', 'expected_location']),
+                        "actual_loc": get_val(['Act Loc', 'Actual Loc', 'Actual Location', 'actual_location']),
+                        "expected_title": get_val(['Exp Event', 'Expected Event', 'Expected Title', 'expected_title']),
+                        "actual_title": get_val(['Act Event', 'Actual Event', 'Actual Title', 'actual_title']),
+                        "status": get_val(['Result', 'Kết quả', 'status']) or 'FAIL',
+                        "error": "" 
+                    })
+                
+                json_data = json.dumps(mapped_data, ensure_ascii=False)
+                
+        except Exception as e:
+            st.error(f"❌ Lỗi đọc file: {e}")
+
+    # Nội dung HTML Dashboard
+    html_template = f"""
+    <!DOCTYPE html>
+    <html lang="vi">
+    <head>
+        <meta charset="UTF-8">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            body {{ background-color: #ffffff; font-family: 'Segoe UI', sans-serif; }}
+            .card {{ border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 12px; margin-bottom: 20px; }}
+            .status-pass {{ color: #198754; font-weight: bold; background: #d1e7dd; padding: 4px 8px; border-radius: 6px; }}
+            .status-fail {{ color: #dc3545; font-weight: bold; background: #f8d7da; padding: 4px 8px; border-radius: 6px; }}
+            .metric-value {{ font-size: 2.5rem; font-weight: 700; color: #333; }}
+            .text-muted-small {{ font-size: 0.85em; color: #6c757d; display: block; margin-top: 2px; }}
+        </style>
+    </head>
+    <body>
+    <div class="container-fluid py-4">
+        <div class="row mb-4">
+            <div class="col-md-3"><div class="card p-3 text-center border-start border-5 border-primary"><div class="metric-value" id="totalCases">0</div><div class="text-muted">Tổng Test Case</div></div></div>
+            <div class="col-md-3"><div class="card p-3 text-center border-start border-5 border-success"><div class="metric-value text-success" id="totalPass">0</div><div class="text-muted">Pass</div></div></div>
+            <div class="col-md-3"><div class="card p-3 text-center border-start border-5 border-danger"><div class="metric-value text-danger" id="totalFail">0</div><div class="text-muted">Fail</div></div></div>
+            <div class="col-md-3"><div class="card p-3 text-center border-start border-5 border-warning"><div class="metric-value text-warning" id="accuracy">0%</div><div class="text-muted">Độ Chính Xác</div></div></div>
+        </div>
+        <div class="row mb-4">
+            <div class="col-md-8"><div class="card p-4"><h5 class="mb-4"><i class="fas fa-chart-pie me-2"></i>Biểu đồ</h5><div style="height: 300px;"><canvas id="resultChart"></canvas></div></div></div>
+            <div class="col-md-4"><div class="card p-4 h-100"><h5 class="mb-4"><i class="fas fa-filter me-2"></i>Bộ lọc</h5><div class="d-grid gap-3"><button class="btn btn-outline-primary" onclick="filterData('ALL')">Tất cả</button><button class="btn btn-outline-success" onclick="filterData('PASS')">Pass</button><button class="btn btn-outline-danger" onclick="filterData('FAIL')">Fail</button></div></div></div>
+        </div>
+        <div class="card">
+            <div class="card-header bg-white py-3"><h5><i class="fas fa-table me-2"></i>Chi tiết</h5></div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th><th style="width:25%">Input</th>
+                            <th>Time <span style="font-size:0.8em; font-weight:normal">(Exp / Act)</span></th>
+                            <th>Loc <span style="font-size:0.8em; font-weight:normal">(Exp / Act)</span></th>
+                            <th>Event <span style="font-size:0.8em; font-weight:normal">(Exp / Act)</span></th>
+                            <th>Result</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script>
+        const testData = {json_data};
+        let currentData = testData;
+        let chartInstance = null;
+        function init() {{ calcMetrics(); renderTable(testData); if(testData.length>0) renderChart(); }}
+        function calcMetrics() {{
+            const total=testData.length; const pass=testData.filter(d=>d.status==='PASS').length;
+            document.getElementById('totalCases').innerText=total; document.getElementById('totalPass').innerText=pass;
+            document.getElementById('totalFail').innerText=total-pass;
+            document.getElementById('accuracy').innerText=total>0?((pass/total)*100).toFixed(2)+'%':'0%';
+        }}
+        function renderTable(data) {{
+            const tb=document.getElementById('tableBody'); tb.innerHTML='';
+            data.forEach(r=>{{
+                const cls=r.status==='PASS'?'status-pass':'status-fail';
+                // Highlight nếu sai
+                const timeCls = r.expected_time !== r.actual_time ? 'text-danger fw-bold' : '';
+                const locCls = r.expected_loc !== r.actual_loc ? 'text-danger fw-bold' : '';
+                const titleCls = r.expected_title !== r.actual_title ? 'text-danger fw-bold' : '';
+                
+                tb.innerHTML+=`<tr>
+                    <td class="fw-bold">#${{r.id}}</td><td>${{r.text}}</td>
+                    <td>${{r.expected_time}}<span class="text-muted-small ${{timeCls}}">${{r.actual_time}}</span></td>
+                    <td>${{r.expected_loc}}<span class="text-muted-small ${{locCls}}">${{r.actual_loc}}</span></td>
+                    <td>${{r.expected_title}}<span class="text-muted-small ${{titleCls}}">${{r.actual_title}}</span></td>
+                    <td><span class="${{cls}}">${{r.status}}</span></td>
+                </tr>`;
+            }});
+        }}
+        function renderChart() {{
+            const ctx=document.getElementById('resultChart').getContext('2d');
+            const pass=testData.filter(d=>d.status==='PASS').length;
+            if(chartInstance) chartInstance.destroy();
+            chartInstance=new Chart(ctx,{{type:'doughnut',data:{{labels:['Pass','Fail'],datasets:[{{data:[pass,testData.length-pass],backgroundColor:['#198754','#dc3545'],borderWidth:0}}]}},options:{{responsive:true,maintainAspectRatio:false,cutout:'70%'}}}});
+        }}
+        function filterData(t) {{ currentData=t==='ALL'?testData:testData.filter(d=>d.status===t); renderTable(currentData); }}
+        init();
+    </script>
+    </body>
+    </html>
+    """
+    components.html(html_template, height=800, scrolling=True)

@@ -1,194 +1,130 @@
 import re
 from datetime import datetime, timedelta
 
-def _extract_time_str(text_segment):
-    """
-    Hàm phụ trợ: Tính toán giờ/phút từ chuỗi đã bắt được.
-    """
-    if not text_segment: return None, None
-    
-    # 1. Xử lý GIỜ KÉM (VD: 8h kém 15, 8 giờ kém 15)
-    kem_match = re.search(r'(\d{1,2})\s*(?:giờ|gio|g|h)?\s*(?:kém|kem)\s*(\d{1,2})', text_segment, re.IGNORECASE)
-    if kem_match:
-        h = int(kem_match.group(1)) - 1
-        m = 60 - int(kem_match.group(2))
-        if m < 0: m += 60; h -= 1
-        if h < 0: h += 24 
-        return h, m
-
-    # 2. Xử lý GIỜ THƯỜNG
-    match = re.search(r'(\d{1,2})\s*(?:giờ|gio|g|h|:|phút|p|ph|\.|-)?\s*(\d{1,2})?', text_segment, re.IGNORECASE)
-    if match:
-        h = int(match.group(1))
-        m = int(match.group(2)) if match.group(2) else 0
-        return h, m
-    
-    return None, None
-
 def extract_datetime(text):
+    text_lower = text.lower()
     now = datetime.now()
     target_date = now.date()
     start_time = None
     end_time = None
     has_time = False
-    
-    # Cờ ngữ cảnh
     is_pm_hint = False
     is_all_day = False 
 
-    # --- TIỀN XỬ LÝ ---
-    text = text.lower()
-    # [Fix Case 20] 6 rưỡi -> 6 30 phút
-    text = re.sub(r'\b(rưỡi|ruoi)\b', ' 30 phút', text)
-
-    # Từ khóa buổi
+    # Từ khóa PM (bao gồm không dấu)
     pm_keywords = r'\b(chiều|chieu|tối|toi|đêm|dem|pm|p\.m\.?)\b'
     
     # --- 1. XỬ LÝ NGÀY (DATE) ---
-    
-    # a. HÔM NAY
-    match_today = re.search(r'\b(hôm nay|hom nay|chiều nay|chieu nay|tối nay|toi nay|trưa nay|trua nay|sáng nay|sang nay)\b', text)
-    if match_today:
-        target_date = now.date()
-        if re.search(pm_keywords, match_today.group(0)): is_pm_hint = True
-        text = text.replace(match_today.group(0), '')
+    date_patterns = [
+        (r'\b(hôm nay|hom nay|chiều nay|chieu nay|tối nay|toi nay|trưa nay|trua nay|sáng nay|sang nay)\b', 0),
+        (r'\b(ngày mai|ngay mai|sáng mai|sang mai|trưa mai|trua mai|chiều mai|chieu mai|tối mai|toi mai)\b', 1),
+        (r'\b(?:sáng|trưa|chiều|tối|đêm)?\s*(ngày kia|ngay kia|ngày mốt|ngay mot)\b', 2),
+        (r'\b(thứ|thu)\s*2|t2\b', 0), (r'\b(thứ|thu)\s*3|t3\b', 1), 
+        (r'\b(thứ|thu)\s*4|t4\b', 2), (r'\b(thứ|thu)\s*5|t5\b', 3),
+        (r'\b(thứ|thu)\s*6|t6\b', 4), (r'\b(thứ|thu)\s*7|t7\b', 5), 
+        (r'\b(chủ nhật|cn|chu nhat)\b', 6),
+        (r'\b(tháng sau|thang sau)\b', 30)
+    ]
 
-    # b. NGÀY MAI
-    match_tomorrow = re.search(r'\b(ngày mai|ngay mai|sáng mai|sang mai|trưa mai|trua mai|chiều mai|chieu mai|tối mai|toi mai)\b', text)
-    if match_tomorrow:
-        target_date = now.date() + timedelta(days=1)
-        if re.search(pm_keywords, match_tomorrow.group(0)): is_pm_hint = True
-        text = text.replace(match_tomorrow.group(0), '')
-
-    # c. [MỚI] NGÀY KIA / NGÀY MỐT (Thêm 2 ngày)
-    # Regex bắt: ngày kia, ngày mốt (có thể kèm sáng/chiều/tối)
-    match_day_after = re.search(r'\b(?:sáng|trưa|chiều|tối|đêm)?\s*(ngày kia|ngay kia|ngày mốt|ngay mot)\b', text)
-    if match_day_after:
-        target_date = now.date() + timedelta(days=2)
-        # Nếu cụm từ có chứa chiều/tối -> Bật gợi ý PM
-        if re.search(pm_keywords, match_day_after.group(0)): is_pm_hint = True
-        text = text.replace(match_day_after.group(0), '')
-
-    # d. NGÀY CỤ THỂ (dd/mm/yyyy)
-    date_match = re.search(r'(\d{1,2})[/-](\d{1,2})(?:[/-](\d{4}))?', text)
-    if date_match:
-        try:
-            d, m = int(date_match.group(1)), int(date_match.group(2))
-            y = int(date_match.group(3)) if date_match.group(3) else now.year
-            target_date = datetime(y, m, d).date()
-            if target_date < now.date() and not date_match.group(3): target_date = target_date.replace(year=y+1)
-        except: pass
-        text = text.replace(date_match.group(0), '')
-
-    # e. THỨ TRONG TUẦN
-    weekdays_map = {r'(thứ|thu)\s*2|t2': 0, r'(thứ|thu)\s*3|t3': 1, r'(thứ|thu)\s*4|t4': 2, r'(thứ|thu)\s*5|t5': 3, r'(thứ|thu)\s*6|t6': 4, r'(thứ|thu)\s*7|t7': 5, r'chủ nhật|cn|chu nhat': 6}
-    for pattern, w_idx in weekdays_map.items():
-        if re.search(pattern, text):
-            is_next = bool(re.search(r'tuần sau|tuan sau|tuần tới|tuan toi', text))
-            diff = w_idx - now.weekday()
-            days_add = diff + 7 if is_next else (diff + 7 if diff <= 0 else diff)
-            target_date = now.date() + timedelta(days=days_add)
-            text = re.sub(pattern, '', text, flags=re.IGNORECASE)
-            text = re.sub(r'tuần sau|tuan sau|tuần tới|tuan toi', '', text, flags=re.IGNORECASE)
-            break
+    for pat, val in date_patterns:
+        m = re.search(pat, text_lower)
+        if m:
+            if 't' in pat or 'cn' in pat: 
+                current_weekday = now.weekday()
+                days_ahead = val - current_weekday
+                if days_ahead <= 0: days_ahead += 7
+                if 'tuần sau' in text_lower or 'tuan sau' in text_lower or 'tuần tới' in text_lower: days_ahead += 7
+                target_date = now.date() + timedelta(days=days_ahead)
+            elif val == 30: 
+                target_date = now.date() + timedelta(days=30)
+            else:
+                target_date = now.date() + timedelta(days=val)
+            
+            if re.search(pm_keywords, m.group(0)): is_pm_hint = True
+            text = re.sub(re.escape(m.group(0)), '', text, flags=re.IGNORECASE)
+            text_lower = text.lower()
 
     # --- 2. XỬ LÝ GIỜ (TIME) ---
-    
-    def check_is_pm(context_text):
-        return bool(re.search(pm_keywords, context_text)) or is_pm_hint
-
-    def normalize_hour(h, is_pm, context_text=""):
-        if h == 12:
-            if re.search(r'đêm|dem', context_text): return 0
-            if is_pm: return 12
-            return 12
+    def normalize_hour(h, is_pm, ctx):
+        if h == 12 and re.search(r'\b(đêm|dem)\b', ctx): return 0
         if is_pm and h < 12: return h + 12
+        if not is_pm and h == 12: return 12
         return h
 
-    # Case A: Khoảng giờ
-    range_match = re.search(r'(?:từ|tu|lúc|vào|ngay|hồi)?\s*\b((?:\d{1,2}[:hjg\.-]|\d{1,2}\s*(?:giờ|gio|g|h)|kém).*?)\s+(?:đến|tới|den|toi|-)\s+\b((?:\d{1,2}[:hjg\.-]|\d{1,2}\s*(?:giờ|gio|g|h)|kém).*?)(?=\s|$|[.,])', text, re.IGNORECASE)
-    if range_match:
-        h_s, m_s = _extract_time_str(range_match.group(1))
-        h_e, m_e = _extract_time_str(range_match.group(2))
-        if h_s is not None and h_e is not None:
-            if (0<=h_s<=23 and 0<=m_s<=59 and 0<=h_e<=23 and 0<=m_e<=59):
-                is_pm = check_is_pm(text)
-                h_s = normalize_hour(h_s, is_pm, text)
-                h_e_temp = normalize_hour(h_e, is_pm, text)
-                if h_e_temp < h_s: h_e_temp += 12
-                
-                start_time = datetime.combine(target_date, datetime.min.time().replace(hour=h_s, minute=m_s))
-                end_time = datetime.combine(target_date, datetime.min.time().replace(hour=h_e_temp, minute=m_e))
-                has_time = True
-                text = text.replace(range_match.group(0), '')
+    # Regex phụ để bắt từ chỉ buổi đi kèm (VD: 6h30 "sáng")
+    # Giúp xóa sạch cụm từ trong text gốc
+    session_suffix = r'(?:\s*(?:sáng|trưa|chiều|tối|đêm|sang|trua|chieu|toi|dem))?'
 
-    # Case B: Giờ đơn lẻ
-    if not has_time:
-        valid_match = None
-        matched_pattern = ""
-        ampm_str = ""
+    patterns = [
+        # Giờ kém
+        (r'(\d{1,2})\s*(?:giờ|gio|g|h)?\s*(?:kém|kem)\s*(\d{1,2})(?:\s*(?:phút|p|ph))?\b' + session_suffix, 'kem'),
+        # Giờ rưỡi (Bắt trực tiếp để xóa chuẩn)
+        (r'\b(\d{1,2})\s*(?:rưỡi|ruoi)\b' + session_suffix, 'half'),
+        # Giờ đầy đủ (6 30 phút)
+        (r'\b(\d{1,2})\s+(\d{1,2})\s*(?:phút|p|ph)\b' + session_suffix, 'full'),
+        # Giờ chuẩn (6h30, 6:30) - Có thể kèm buổi
+        (r'\b(\d{1,2})\s*(?:h|g|:|giờ|gio)\s*(\d{0,2})\b' + session_suffix, 'std'),
+        # AM/PM
+        (r'\b(\d{1,2})\s*(a\.?m\.?|p\.?m\.?)\b', 'ampm'),
+        # Từ khóa (lúc 9, chuyến 9)
+        (r'(?:lúc|vào|hồi|deadline)\s+(\d{1,2})\b' + session_suffix, 'key'),
+        # Chuyến (giữ lại chữ chuyến cho event name)
+        (r'(?<=chuyến)\s*(\d{1,2})(?:h|g|:|giờ)?\b' + session_suffix, 'chuyen_time')
+    ]
 
-        patterns = [
-            # 1. Giờ kém (Ưu tiên số 1)
-            (r'(\d{1,2})\s*(?:giờ|gio|g|h)?\s*(?:kém|kem)\s*(\d{1,2})(?:\s*(?:phút|p|ph))?\b', 'kem'),
-
-            # 2. Giờ + Phút có đơn vị
-            (r'\b(\d{1,2})\s+(\d{1,2})\s*(?:phút|p|ph)\b', 'full_unit'),
+    valid_match = None
+    p_type = ""
+    for pat, pt in patterns:
+        m = re.search(pat, text_lower)
+        if m:
+            valid_match = m
+            p_type = pt
+            break
             
-            # 3. Giờ + Unit
-            (r'\b(\d{1,2})\s*(?:h|g|:|giờ|gio)\s*(\d{0,2})\b', 'std_unit'),
-            
-            # 4. Giờ + AM/PM
-            (r'\b(\d{1,2})\s*(a\.?m\.?|p\.?m\.?)\b', 'ampm'),
-            
-            # 5. Từ khóa + Số
-            (r'(?:lúc|vào|hồi|deadline|chuyến)\s+(\d{1,2})\b', 'keyword_only'),
-        ]
-
-        for pat, p_type in patterns:
-            m = re.search(pat, text, re.IGNORECASE)
-            if m:
-                valid_match = m
-                matched_pattern = p_type
-                break
-        
-        if valid_match:
+    if valid_match:
+        try:
             h, m = 0, 0
+            # Parse giờ tùy theo pattern
+            if p_type == 'kem':
+                h, m = int(valid_match.group(1)) - 1, 60 - int(valid_match.group(2))
+            elif p_type == 'half':
+                h, m = int(valid_match.group(1)), 30
+            elif p_type == 'ampm':
+                h = int(valid_match.group(1))
+                if 'p' in valid_match.group(2).lower() and h < 12: h += 12
+                if 'a' in valid_match.group(2).lower() and h == 12: h = 0
+            elif p_type == 'chuyen_time':
+                h = int(valid_match.group(1))
+            else:
+                h = int(valid_match.group(1))
+                if valid_match.group(2): m = int(valid_match.group(2))
+
+            # PM Logic
+            is_pm = bool(re.search(pm_keywords, text_lower)) or is_pm_hint
+            # Nếu trong chính cụm bắt được có từ chỉ buổi (VD: 5h "chiều") -> Ưu tiên nó
+            if re.search(pm_keywords, valid_match.group(0)): is_pm = True
             
-            if matched_pattern == 'kem':
-                h = int(valid_match.group(1)) - 1
-                m = 60 - int(valid_match.group(2))
-                if m < 0: m += 60; h -= 1
-            elif matched_pattern == 'ampm':
-                h = int(valid_match.group(1))
-                ampm_str = valid_match.group(2)
-            elif matched_pattern == 'keyword_only':
-                h = int(valid_match.group(1))
-            else: 
-                h = int(valid_match.group(1))
-                m = int(valid_match.group(2)) if valid_match.group(2) else 0
+            if p_type != 'ampm': h = normalize_hour(h, is_pm, text_lower)
 
-            # --- Logic chuẩn hóa giờ (12h -> 24h) ---
-            if 0 <= h <= 23 and 0 <= m <= 59:
-                is_pm = check_is_pm(text)
-                
-                if matched_pattern == 'ampm' and ampm_str:
-                    if 'p' in ampm_str.lower() and h < 12: h += 12
-                    if 'a' in ampm_str.lower() and h == 12: h = 0
-                else:
-                    h = normalize_hour(h, is_pm, text)
+            start_time = datetime.combine(target_date, datetime.min.time().replace(hour=h%24, minute=m%60))
+            end_time = start_time + timedelta(hours=1)
+            has_time = True
+            
+            # Xóa cụm giờ đã bắt được khỏi text gốc
+            text = re.sub(re.escape(valid_match.group(0)), '', text, flags=re.IGNORECASE)
+        except: pass
 
-                start_time = datetime.combine(target_date, datetime.min.time().replace(hour=h, minute=m))
-                end_time = start_time + timedelta(minutes=60)
-                has_time = True
-                text = text.replace(valid_match.group(0), '')
-
-    # --- 3. XỬ LÝ ALL DAY ---
     if not start_time:
-        start_time = datetime.combine(target_date, datetime.min.time()) 
+        start_time = datetime.combine(target_date, datetime.min.time())
         end_time = start_time + timedelta(days=1)
-        is_all_day = True 
+        is_all_day = True
 
-    text = re.sub(r'\b(vào|lúc|hồi|sáng|trưa|chiều|tối|ngày|tới|đến|từ)\b', '', text, flags=re.IGNORECASE)
+    # --- 3. CLEANUP (Dọn rác kỹ hơn) ---
+    remove_list = r'\b(vào|lúc|hồi|ngày|tới|đến|từ|luc|vao|ngay|tu|den|toi|deadline|tuần sau|tuần tới)\b'
+    text = re.sub(remove_list, '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\b(a\.?m\.?|p\.?m\.?)\b', '', text, flags=re.IGNORECASE)
+    
+    # Xóa các từ chỉ buổi nếu còn sót lại (đứng độc lập)
+    text = re.sub(r'\b(sáng|trưa|chiều|tối|đêm|sang|trua|chieu|toi|dem)\s+(nay|mai|qua|kia|mốt|t\d|cn|chủ nhật|thứ)\b', '', text, flags=re.IGNORECASE)
     
     return start_time, end_time, text, has_time, is_all_day
