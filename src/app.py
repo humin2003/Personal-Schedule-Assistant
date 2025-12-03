@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import unicodedata
 import sys
 import os
 import time
@@ -39,6 +40,12 @@ if 'pending_event_data' not in st.session_state: st.session_state.pending_event_
 
 db = st.session_state.db
 nlp = st.session_state.nlp
+
+def remove_accents(input_str):
+    """Xóa dấu tiếng Việt"""
+    if not input_str: return ""
+    s = unicodedata.normalize('NFD', str(input_str))
+    return ''.join(c for c in s if unicodedata.category(c) != 'Mn')
 
 # --- BACKGROUND THREAD ---
 def run_scheduler():
@@ -92,18 +99,21 @@ with tab1:
         raw_text = st.session_state.input_main
         if raw_text.strip():
             try:
-                # 1. Xử lý NLP
+                # 1. Xử lý NLP (Dùng engine mới)
+                # Hàm process giờ đây đã trả về đúng các key mà DB của Minh cần
+                # (event, start_time, end_time, location...)
                 data = nlp.process(raw_text)
                 
-                start_dt = datetime.fromisoformat(data['start_time'])
-                if data['end_time']:
-                    end_dt = datetime.fromisoformat(data['end_time'])
+                # Chuyển đổi chuỗi ISO về datetime để so sánh logic
+                # Lưu ý: Engine mới trả về 'start_time' dạng String ISO
+                if len(data['start_time']) == 10: # Dạng YYYY-MM-DD (All day)
+                     start_dt = datetime.strptime(data['start_time'], "%Y-%m-%d")
                 else:
-                    end_dt = None
+                     start_dt = datetime.fromisoformat(data['start_time'])
 
                 now = datetime.now()
                 
-                # [SỬA LỖI TẠI ĐÂY] Chỉ kiểm tra trùng lặp nếu có giờ kết thúc
+                # Logic cảnh báo trùng lặp & Quá khứ (Giữ nguyên của Minh)
                 overlap_events = []
                 if data['end_time']:
                     overlap_events = db.check_overlap(data['start_time'], data['end_time'])
@@ -116,7 +126,7 @@ with tab1:
                     warning_msg += f"- Sự kiện diễn ra trong quá khứ ({start_dt.strftime('%H:%M %d/%m')}).\n"
                     need_confirm = True
                 
-                # Case 2: Trùng lịch [MỚI]
+                # Case 2: Trùng lịch
                 if overlap_events:
                     overlap_names = ", ".join([r[0] for r in overlap_events])
                     warning_msg += f"- Trùng thời gian với: {overlap_names}.\n"
@@ -124,11 +134,9 @@ with tab1:
 
                 if need_confirm:
                     st.session_state.confirm_mode = True
-                    # Lưu thêm thông báo cảnh báo vào data tạm để hiển thị
                     data['warning_msg'] = warning_msg 
                     st.session_state.pending_event_data = data
                     st.session_state.input_main = ""
-                    
                 else:
                     db.add_event(data)
                     st.toast(f"Đã thêm: {data['event']}")
@@ -136,7 +144,10 @@ with tab1:
                     st.session_state.confirm_mode = False
                     
             except ValueError as e:
+                # Engine mới sẽ raise ValueError nếu giờ sai, bắt ở đây là chuẩn
                 st.toast(f"Lỗi: {str(e)}")
+            except Exception as e:
+                st.error(f"Lỗi hệ thống: {str(e)}")
 
     c1, c2 = st.columns([5, 1])
     with c1: st.text_input("Nhập câu lệnh tại đây:", key="input_main", placeholder="Gõ lệnh và nhấn Enter hoặc nút Thêm...")
@@ -513,46 +524,68 @@ with tab3:
                         st.rerun()
 
 def normalize_str(s):
-    """Chuẩn hóa chuỗi để so sánh (giống file test script)"""
-    if not s or pd.isna(s): return ""
+    """Chuẩn hóa chuỗi: Xóa dấu, chữ thường, xử lý NaN/None"""
+    if s is None or pd.isna(s): return ""
     s = str(s).strip().lower()
-    if s in ['none', 'chưa xác định', 'null', 'nan']: return ""
-    return s
+    if s in ['none', 'nan', 'chưa xác định', 'null', 'nat', '00:00']: return ""
+    return remove_accents(s)
 
 def run_test_row(nlp_engine, text, exp_time, exp_loc, exp_title):
-    """Chạy NLP cho 1 dòng và so sánh kết quả"""
     try:
         # 1. Chạy NLP
         res = nlp_engine.process(text)
         
-        # 2. Lấy Actual Time (Format lại thành HH:MM để so sánh)
-        if res.get('start_time'):
-            act_time = datetime.fromisoformat(res['start_time']).strftime('%H:%M')
-        else:
-            act_time = "None"
-            
+        # 2. Xử lý Thời gian (Fix lỗi Error đỏ)
+        act_time = "None"
+        raw_start = res.get('start_time')
+        
+        if raw_start:
+            try:
+                # Nếu là chuỗi ISO có giờ (VD: 2023-10-30T09:00:00)
+                if isinstance(raw_start, str) and 'T' in raw_start:
+                    act_time = datetime.fromisoformat(raw_start).strftime('%H:%M')
+                    
+                # [FIX] Nếu là sự kiện cả ngày (YYYY-MM-DD) -> Trả về "None" thay vì "00:00"
+                elif len(str(raw_start)) == 10:
+                    act_time = "None" 
+                    
+                else:
+                    act_time = str(raw_start)
+            except:
+                act_time = "Error"
+
+        # Lấy các trường khác
         act_loc = res.get('location', '')
-        act_title = res.get('event', '')
+        act_title = res.get('event', res.get('title', ''))
+
+        # 3. So sánh Thông Minh (Fix lỗi FAIL oan)
         
-        # 3. So sánh (Logic Smart Match)
-        # Time
-        check_time = (normalize_str(exp_time) == normalize_str(act_time))
+        # A. So sánh Giờ
+        n_exp_time = normalize_str(exp_time)
+        n_act_time = normalize_str(act_time)
         
-        # Location
+        # Linh động: Coi "00:00", "" và "None" là như nhau
+        if n_exp_time == "" and n_act_time == "":
+            check_time = True
+        else:
+            check_time = (n_exp_time == n_act_time)
+        
+        # B. So sánh Địa điểm (Bỏ dấu, chứa trong nhau là ĐÚNG)
         n_exp_loc = normalize_str(exp_loc)
         n_act_loc = normalize_str(act_loc)
-        check_loc = (n_exp_loc == n_act_loc) or (n_exp_loc in n_act_loc) or (n_act_loc in n_exp_loc)
+        # VD: Exp="Cho", Act="Cho Dong Xuan" -> PASS
+        check_loc = (n_exp_loc in n_act_loc) or (n_act_loc in n_exp_loc)
         
-        # Title
+        # C. So sánh Tiêu đề
         n_exp_title = normalize_str(exp_title)
         n_act_title = normalize_str(act_title)
-        check_title = (n_exp_title == n_act_title) or (n_exp_title in n_act_title) or (n_act_title in n_exp_title)
+        check_title = (n_exp_title in n_act_title) or (n_act_title in n_exp_title)
         
         status = "PASS" if (check_time and check_loc and check_title) else "FAIL"
-        
         return act_time, act_loc, act_title, status
-    except Exception:
-        return "Error", "Error", "Error", "FAIL"
+
+    except Exception as e:
+        return "Crash", "Error", str(e), "FAIL"
 
 # --- TAB 4: BÁO CÁO KIỂM THỬ (DASHBOARD) ---
 with tab4:

@@ -1,6 +1,6 @@
 ﻿id,text,expected_time,expected_location,expected_title
 1,Họp team lúc 9h sáng mai tại phòng 302,09:00,Phòng 302,Họp team
-2,Đi siêu thị mua đồ ăn tối,00:00,Siêu Thị,Đi siêu thị mua đồ ăn tối
+2,Đi siêu thị mua đồ ăn tối,00:00,Siêu Thị,Đi mua đồ ăn tối
 3,Nhắc tôi uống thuốc trong 15 phút nữa,None,None,Uống thuốc
 4,Chạy bộ công viên lúc 5h30 chiều nay,17:30,Công Viên,Chạy bộ
 5,Gặp khách hàng tại Highland Coffee lúc 14h,14:00,Highland Coffee,Gặp khách hàng

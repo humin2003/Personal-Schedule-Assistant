@@ -1,33 +1,90 @@
 import re
 
-def extract_reminder(text):
-    """
-    Trích xuất thông tin nhắc trước bao lâu.
-    Input: "... hãy nhắc tôi trước 30 phút ..."
-    Output: (30, "text đã xóa cụm nhắc")
-    """
-    reminder_minutes = 15 # Mặc định
-    
-    # [FIX] Cập nhật Regex linh hoạt hơn:
-    # 1. (?:hãy\s+)? -> Chấp nhận có chữ "hãy" hoặc không
-    # 2. (?:nhắc|báo|gọi) -> Các từ khóa lệnh
-    # 3. (?:\s+(?:tôi|mình|em|anh|chị|bạn|cho tôi))? -> Chấp nhận từ xưng hô ở giữa
-    # 4. \s+(?:trước|sớm) -> Từ khóa thời gian
-    
-    pattern = r'(?:hãy\s+)?(?:nhắc|báo|gọi)(?:\s+(?:tôi|mình|em|anh|chị|bạn|cho tôi|cho mình))?\s+(?:trước|sớm)\s+(\d+)\s*(phút|p|tiếng|h|giờ)'
-    
-    match = re.search(pattern, text, re.IGNORECASE)
-    
-    if match:
-        amount = int(match.group(1)) # Lấy số (VD: 25)
-        unit = match.group(2).lower() # Lấy đơn vị (VD: phút)
+class RuleBasedExtractor:
+    def __init__(self):
+        self.patterns = {
+            # 1. Bắt Giờ
+            "time_absolute": [
+                r"\b(\d{1,2})\s*[:hg]\s*(\d{2})\b",
+                r"\b(\d{1,2})\s*giờ\s*(\d{1,2})\b",
+                r"\b(\d{1,2})\s*(?:h|g|giờ)?\s*kém\s*(\d{1,2})\b",
+                r"\b(\d{1,2})\s*(?:h|g|giờ)?\s*rưỡi\b",
+                r"\b(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.?|p\.m\.?)\b",
+                r"\b(\d{1,2})\s*(h|g|giờ)\b"
+            ],
+            
+            # 2. Bắt Ngày/Tháng
+            "date_absolute": [
+                r"\b(\d{1,2})\s*[/-]\s*(\d{1,2})\b",             
+                r"ngày\s+(\d{1,2})\s+tháng\s+(\d{1,2})"      
+            ],
+
+            # 3. Bắt Thứ
+            "weekday": [
+                r"(?:thứ\s+(?:\d+|hai|ba|tư|năm|sáu|bảy)|chủ\s+nhật|cn|t\d)\s+tuần\s+(?:sau|tới|này|trước)",
+                r"thứ\s+(\d+|hai|ba|tư|năm|sáu|bảy)",
+                r"chủ\s+nhật",
+                r"\b(t[2-7]|cn)\b"
+            ],
+            
+            # 4. Ngày tương đối
+            "date_relative": [
+                r"\b(?:sáng|trưa|chiều|tối|đêm|khuya)\s+(?:mai|mốt|kia|hôm qua|qua)\b",
+                r"\b(?:ngày|ngay)\s*(?:mai|kia|mốt|mot)\b",
+                r"\b(?:hôm|hom)\s*(?:nay|qua|kia|sau)\b",
+                r"(?<=\d)\s*(?:ngày|ngay)?\s*(mai|mốt|mot|kia)\b",
+                r"(?<=[hg])\s*(?:ngày|ngay)?\s*(mai|mốt|mot|kia)\b",
+                r"^\s*(mai|mốt|mot|kia)\b",
+                r"\b(mai|mốt|mot|kia)\s+(?:lúc|vào)?\s*\d",
+                r"\b(?:tuần|tuan)\s*(?:này|nay|sau|tới|toi)\b",
+                r"\b(?:cuối tuần|cuoi tuan)\b",
+            ],
+            
+            # 5. Buổi
+            "session": [
+                r"\b(sáng|trưa|chiều|tối|đêm|sang|trua|chieu|toi|dem)\b"
+            ]
+        }
+
+    def extract(self, text):
+        results = {
+            "time_str": None, "date_str": None,
+            "day_month": None, "session": None,
+            "special_type": None
+        }
         
-        if unit in ['tiếng', 'h', 'giờ']:
-            reminder_minutes = amount * 60
-        else:
-            reminder_minutes = amount
+        for p in self.patterns["time_absolute"]:
+            match = re.search(p, text, re.IGNORECASE)
+            if match:
+                results["time_str"] = match.group(0)
+                if "rưỡi" in results["time_str"]: results["special_type"] = "half"
+                if "kém" in results["time_str"]: results["special_type"] = "less"
+                break
         
-        # Xóa cụm này khỏi text để tên sự kiện sạch đẹp
-        text = text.replace(match.group(0), '')
+        for p in self.patterns["date_absolute"]:
+            match = re.search(p, text, re.IGNORECASE)
+            if match:
+                results["day_month"] = (int(match.group(1)), int(match.group(2)))
+                break
+
+        if not results["day_month"]:
+            for p in self.patterns["weekday"]:
+                match = re.search(p, text, re.IGNORECASE)
+                if match:
+                    results["date_str"] = match.group(0)
+                    break
         
-    return reminder_minutes, text
+            if not results["date_str"]:
+                for p in self.patterns["date_relative"]:
+                    match = re.search(p, text, re.IGNORECASE)
+                    if match:
+                        results["date_str"] = match.group(0)
+                        break
+        
+        for p in self.patterns["session"]:
+            match = re.search(p, text, re.IGNORECASE)
+            if match:
+                results["session"] = match.group(0)
+                break
+                
+        return results

@@ -1,42 +1,132 @@
+from datetime import datetime, timedelta
 import re
-from datetime import datetime
-from . import processor, rules, ner, time_parser
+import unicodedata
+from .processor import TextProcessor
+from .ner import EntityExtractor
+from .rules import RuleBasedExtractor
+from .time_parser import TimeParser
+
+def remove_accents(input_str):
+    if not input_str: return ""
+    s = unicodedata.normalize('NFD', str(input_str))
+    return ''.join(c for c in s if unicodedata.category(c) != 'Mn')
 
 class NLPEngine:
     def __init__(self):
-        pass
+        self.processor = TextProcessor()
+        self.ner = EntityExtractor()
+        self.rules = RuleBasedExtractor()
+        self.timer = TimeParser()
 
-    def process(self, raw_text):
-        original_text = raw_text
+    def process(self, raw_text): 
+        clean_text = self.processor.normalize(raw_text)
         
-        # 1. Trích xuất nhắc nhở
-        reminder_minutes, clean_text = rules.extract_reminder(raw_text)
+        # 1. Trích xuất
+        raw_location = self.ner.extract_location(clean_text)
+        time_info = self.rules.extract(clean_text)
         
-        # 2. Tiền xử lý
-        clean_text = processor.normalize_text(clean_text)
-        
-        # 3. Time Parser chạy TRƯỚC (Để lọc giờ)
-        start_time, end_time, clean_text, has_time, is_all_day = time_parser.extract_datetime(clean_text)
-        
-        # 4. NER chạy SAU (Với bộ lọc thông minh hơn)
-        location, clean_text = ner.extract_location(clean_text)
-        
-        # 5. Dọn dẹp tên sự kiện
-        clean_text = processor.remove_stop_phrases(clean_text)
-        event_name = re.sub(r'\s+', ' ', clean_text).strip(' ,.-')
-        if not event_name: event_name = "Sự kiện mới"
+        # 2. Xử lý địa điểm
+        final_location = ""
+        if raw_location:
+            collision = False
+            if time_info['date_str'] and remove_accents(time_info['date_str']) in remove_accents(raw_location.lower()): collision = True
+            if time_info['time_str'] and time_info['time_str'] in raw_location.lower(): collision = True
+            
+            time_keywords = ["tuần", "tháng", "năm", "hôm", "mai", "mốt", "lúc", "giờ"]
+            if any(k in raw_location.lower() for k in time_keywords): collision = True
 
-        # Validation
-        if end_time and end_time <= start_time:
-            end_time = start_time.replace(hour=(start_time.hour + 1) % 24)
-            if end_time < start_time: end_time = end_time.replace(day=start_time.day + 1)
+            if not collision:
+                final_location = raw_location.title()
+
+        # 3. Tính toán thời gian
+        time_obj, time_error = self.timer.parse_time(
+            time_info['time_str'], 
+            time_info['session'], 
+            time_info.get('special_type')
+        )
+        date_obj, is_valid_date = self.timer.parse_date(time_info['date_str'], time_info['day_month'])
+
+        if time_error: raise ValueError(time_error)
+
+        start_time_str = ""
+        end_time_str = None
+        all_day = False
+
+        if time_obj:
+            final_dt = date_obj.replace(hour=time_obj.hour, minute=time_obj.minute, second=0, microsecond=0)
+            start_time_str = final_dt.isoformat()
+            end_time_str = (final_dt + timedelta(hours=1)).isoformat()
+        else:
+            start_time_str = date_obj.strftime("%Y-%m-%d")
+            all_day = True 
+
+        # 4. XỬ LÝ TIÊU ĐỀ (CLEAN TITLE)
+        title = raw_text
+        items_to_remove = []
+        
+        # A. Địa điểm
+        if final_location:
+            items_to_remove.append(final_location)
+            items_to_remove.append(remove_accents(final_location))
+        
+        # B. Thời gian
+        if time_info['time_str']: items_to_remove.append(time_info['time_str'])
+        if time_info['date_str']: items_to_remove.append(time_info['date_str'])
+        
+        # C. Buổi (Giữ lại nếu là hành động "Ăn trưa")
+        session = time_info['session']
+        if session:
+            normalized_text = remove_accents(clean_text)
+            normalized_session = remove_accents(session)
+            is_activity = re.search(rf"\ban\s+{normalized_session}\b", normalized_text, re.IGNORECASE)
+            if not is_activity:
+                items_to_remove.append(session)
+
+        items_to_remove.sort(key=len, reverse=True)
+
+        for item in items_to_remove:
+            if item:
+                title = re.sub(re.escape(item), '', title, flags=re.IGNORECASE)
+        
+        # --- [CLEANUP LOGIC MỚI] ---
+        
+        # 1. Xóa Prefix
+        start_prefixes = [
+            "tôi có hẹn", "tôi muốn", "nhắc tôi", "nhớ là", "lên lịch", "ghi chú", 
+            "thêm sự kiện", "đặt lịch", "nhắc nhở"
+        ]
+        lower_title = title.lower().strip()
+        for p in start_prefixes:
+            if lower_title.startswith(p):
+                title = title[len(p):] 
+                break 
+
+        # 2. Xóa từ nối an toàn (Dangling Connectors)
+        # Các từ này chỉ bị xóa nếu nó KHÔNG đứng ở đầu câu (tránh xóa mất động từ chính)
+        # (?<!^) : Lookbehind phủ định -> Đảm bảo không phải đầu dòng
+        
+        # Nhóm 1: Từ nối thời gian/địa điểm (lúc, tại, ở, vào...) -> Xóa khá thoải mái
+        title = re.sub(r"\b(lúc|vào|tại|ở|trong)\b", " ", title, flags=re.IGNORECASE)
+
+        # Nhóm 2: Từ nối chuyển động (đi, đến, về, qua) -> Cẩn thận
+        # Chỉ xóa nếu nó đứng lơ lửng, không xóa nếu ở đầu câu (VD: "Đi chơi" -> Giữ nguyên)
+        # Fix Case #14: "Bay [đi] chuyến" -> Xóa "đi"
+        move_connectors = r"(?<!^)\b(đi|đến|về|qua)\b"
+        title = re.sub(move_connectors, " ", title, flags=re.IGNORECASE)
+        
+        # Nhóm 3: Các từ rác khác (chuyến)
+        title = re.sub(r"\b(chuyến|chuyen)\b", " ", title, flags=re.IGNORECASE)
+
+        # 3. Dọn dẹp khoảng trắng
+        title = re.sub(r'\s+', ' ', title).strip().strip(",.-")
+        if len(title) < 2: title = "Sự kiện mới"
 
         return {
-            "event": event_name.capitalize(),
-            "start_time": start_time.isoformat(),
-            "end_time": end_time.isoformat() if end_time else None, 
-            "location": location.title(),
-            "reminder_minutes": reminder_minutes,
-            "original_text": original_text,
-            "is_all_day": is_all_day
+            "event": title.capitalize(),
+            "start_time": start_time_str,
+            "end_time": end_time_str,
+            "location": final_location,
+            "reminder_minutes": 15,
+            "is_all_day": all_day,
+            "original_text": raw_text
         }

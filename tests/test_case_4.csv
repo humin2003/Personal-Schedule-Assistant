@@ -1,0 +1,41 @@
+﻿id,text,expected_time,expected_location,expected_title
+1,Họp team lúc 9h sáng tại phòng 302,09:00,Phòng 302,Họp team
+2,Đi xem phim ở rạp CGV lúc 19h,19:00,Rạp Cgv,Đi xem phim
+3,Deadline báo cáo lúc 17h chiều nay,17:00,None,Deadline báo cáo
+4,Ăn trưa với khách hàng tại nhà hàng Biển Đông,None,Nhà Hàng Biển Đông,Ăn trưa với khách hàng
+5,Đá bóng sân Mỹ Đình lúc 17h30,17:30,Sân Mỹ Đình,Đá bóng
+6,Hẹn bác sĩ nha khoa lúc 8h kém 15,07:45,None,Hẹn bác sĩ nha khoa
+7,Đi chợ mua đồ nấu ăn,None,Chợ,Đi mua đồ nấu ăn
+8,Chạy bộ công viên Yên Sở,None,Công Viên Yên Sở,Chạy bộ
+9,Bay đi Đà Nẵng chuyến 14h chiều,14:00,Đà Nẵng,Bay đi chuyến
+10,Ghé siêu thị BigC mua hoa quả,None,Siêu Thị Bigc,Ghé mua hoa quả
+11,Làm bài tập ở thư viện quốc gia,None,Thư Viện Quốc Gia,Làm bài tập
+12,Đi ngủ sớm mai dậy đi làm,None,None,Đi ngủ sớm mai dậy đi làm
+13,Di da bong san Thong Nhat luc 5h chieu,17:00,Sân Thống Nhất,Di da bong
+14,Hop nhom tai quan cafe Highland,None,Quán Cafe Highland,Hop nhom
+15,Di Vung Tau choi cuoi tuan,None,Vũng Tàu,Di choi cuoi tuan
+16,Dat lich kham benh o benh vien Bach Mai,None,Bệnh Viện Bạch Mai,Dat lich kham benh
+17,Di hoc them tieng anh luc 19g30,19:30,None,Di hoc them tieng anh
+18,Gap doi tac o toa nha Keangnam,None,Toa Nha Keangnam,Gap doi tac
+19,Di bo ho Guom hong gio,None,Hồ Gươm,Di bo hong gio
+20,Book ve may bay di Nha Trang,None,Nha Trang,Book ve may bay
+21,Nhậu với anh em ở quán 123 dô,None,Quán 123 Dô,Nhậu với anh em
+22,Gọi điện cho mẹ lúc 21h,21:00,None,Gọi điện cho mẹ
+23,Đi bơi ở bể bơi Bốn Mùa,None,Bể Bơi Bốn Mùa,Đi bơi
+24,Tham gia workshop tại F-Soft lúc 2pm,14:00,F-Soft,Tham gia workshop
+25,Di sieu thi mua rau cu,None,Siêu Thị,Di mua rau cu
+26,Check in khach san Sheraton luc 12h,12:00,Khách Sạn Sheraton,Check in
+27,Di dạo phố đi bộ nguyễn huệ,None,Phố Đi Bộ Nguyễn Huệ,Di dạo
+28,Phong van o toa nha FPT luc 9am,09:00,Toà Nhà Fpt,Phong van
+29,Lên thư viện học bài,None,Thư Viện,Lên học bài
+30,Về quê thăm bà ngoại,None,None,Về quê thăm bà ngoại
+31,Di lam o cong ty luc 8h,08:00,Công Ty,Di lam
+32,An toi tai nha hang Sen,None,Nha Hang Sen,An toi
+33,Tập yoga ở phòng tập Cali lúc 6h,06:00,Phòng Tập Cali,Tập yoga
+34,Chay deadline sap mat,None,None,Chay deadline sap mat
+35,Di xem phim rap Quoc Gia,None,Rap Quoc Gia,Di xem phim
+36,Sinh nhat o quan karaoke Nice,None,Quan Karaoke Nice,Sinh nhat
+37,Di dao cong vien Cau Giay,None,Cong Vien Cau Giay,Di dao
+38,Di cho Dong Xuan mua do,None,Cho Dong Xuan,Di mua do
+39,Uong cafe o Starbuck luc 7h,07:00,Starbuck,Uong cafe
+40,Di Phu Quoc chuyen bay luc 10h30,10:30,Phú Quốc,Di chuyen bay
