@@ -16,7 +16,7 @@
 ## II. Tính năng nổi bật
 * **Nhập liệu ngôn ngữ tự nhiên (NLP):**
     * Hiểu các câu lệnh phức tạp: *"Họp team lúc 9h sáng mai tại phòng 302"*.
-    * **MỚI:** Tự động bắt yêu cầu nhắc nhở: *"Nhắc tôi trước 15 phút"*.
+    * Tự động bắt yêu cầu nhắc nhở: *"Nhắc tôi trước 15 phút"*.
     * Xử lý linh hoạt thời gian kết thúc (End Time) và dọn dẹp các từ nối dư thừa.
 * **Hệ thống nhắc nhở (System Tray):** Ứng dụng chạy ngầm và hiển thị thông báo Pop-up trên Windows khi đến giờ hẹn.
 * **Giao diện trực quan:** Tích hợp Lịch (Calendar View) và Danh sách (List View).
