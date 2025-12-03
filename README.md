@@ -4,8 +4,11 @@
 Ứng dụng quản lý lịch trình thông minh trên Desktop (Windows), tích hợp **Xử lý Ngôn ngữ Tự nhiên (NLP) tiếng Việt**, giúp người dùng thêm sự kiện nhanh chóng bằng các câu lệnh đời thường thay vì nhập liệu thủ công phức tạp.
 
 **Sinh viên thực hiện:** Trần Hữu Minh
+
 **MSSV:** 3121410323
+
 **Môn học:** Đồ án chuyên ngành (2025-2026)
+
 **Trạng thái:** Hoàn thiện (v1.0 - Production Ready)
 
 ---
@@ -80,3 +83,21 @@ Yêu cầu máy đã cài đặt Python và Git.
  ┣ 📜 schedule_app.spec     # Cấu hình đóng gói PyInstaller (Quan trọng)
  ┣ 📜 requirements.txt      # Danh sách thư viện
  ┗ 📜 README.md             # Hướng dẫn sử dụng
+
+---
+
+
+## VI. Kết quả kiểm thử NLP
+Tổng số Test Case: Hơn 100 câu lệnh tiếng Việt đa dạng (3 file test_cases).
+
+Độ chính xác (Accuracy): Trên 90%
+
+Khả năng xử lý:
+
+✅ Thời gian tuyệt đối/tương đối (9h sáng, sáng mai, tuần sau).
+
+✅ Nhắc nhở (nhắc trước 30p).
+
+✅ Địa điểm (tại phòng 302, ở rạp CGV).
+
+✅ Loại bỏ từ nối rác (với, của, đi, đến...).
