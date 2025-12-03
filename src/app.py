@@ -88,7 +88,7 @@ st.title("Trợ lý Quản lý Lịch trình Thông minh")
 st.markdown("---")
 
 # [CẬP NHẬT] Thêm Tab 4 vào danh sách
-tab1, tab2, tab3, tab4 = st.tabs(["➕ Thêm sự kiện", "Xem Lịch Biểu", "Quản lý & Xuất file", "📊 Báo cáo Kiểm thử"])
+tab1, tab2, tab3, tab4 = st.tabs(["Thêm sự kiện", "Xem Lịch Biểu", "Quản lý & Xuất file", "Báo cáo Kiểm thử"])
 
 # --- TAB 1: THÊM SỰ KIỆN ---
 with tab1:
@@ -589,8 +589,8 @@ def run_test_row(nlp_engine, text, exp_time, exp_loc, exp_title):
 
 # --- TAB 4: BÁO CÁO KIỂM THỬ (DASHBOARD) ---
 with tab4:
-    st.header("📊 NLP Accuracy Dashboard")
-    st.caption("Tải lên file `test_cases_2.csv` (Input) hoặc file báo cáo kết quả.")
+    st.header("NLP Accuracy Dashboard")
+    st.caption("Tải lên file test cases trong folder tests để thực hiện kiểm thử.")
     
     uploaded_report = st.file_uploader("Chọn file CSV:", type=['csv'], label_visibility="collapsed")
     json_data = "[]" 
@@ -608,14 +608,14 @@ with tab4:
             id_col = cols.get('id')
             
             if id_col is None:
-                st.error(f"❌ Không tìm thấy cột ID. Các cột có trong file: {list(df_report.columns)}")
+                st.error(f"Không tìm thấy cột ID. Các cột có trong file: {list(df_report.columns)}")
             else:
                 # Kiểm tra xem đây là file Input (chưa có kết quả) hay Report (đã có kết quả)
                 # File Input thường KHÔNG có cột 'status' hoặc 'result'
                 is_input_file = 'result' not in cols and 'kết quả' not in cols and 'status' not in cols
                 
                 if is_input_file:
-                    st.info("🚀 Đang chạy kiểm thử tự động trên file Input...")
+                    st.info("Đang chạy kiểm thử tự động trên file Input...")
                     progress_bar = st.progress(0)
                     total_rows = len(df_report)
                 else:
@@ -665,7 +665,7 @@ with tab4:
                 json_data = json.dumps(mapped_data, ensure_ascii=False)
                 
         except Exception as e:
-            st.error(f"❌ Lỗi xử lý file: {e}")
+            st.error(f"Lỗi xử lý file: {e}")
 
     # Nội dung HTML Dashboard (Cập nhật tiêu đề cột cho khớp)
     html_template = f"""
