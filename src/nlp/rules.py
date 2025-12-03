@@ -43,6 +43,12 @@ class RuleBasedExtractor:
             # 5. Buổi
             "session": [
                 r"\b(sáng|trưa|chiều|tối|đêm|sang|trua|chieu|toi|dem)\b"
+            ],
+
+            "reminder": [
+                # Cấu trúc: (hãy)? (nhắc/báo/hẹn) (nhở/tôi/mình/...) (trước/lại/thêm)? (số) (đơn vị)
+                # VD: "hãy nhắc tôi trước 15 phút", "nhắc mình 30p", "báo trước 1h"
+                r"\b(?:hãy\s+)?(?:nhắc|báo|hẹn|thông báo)\s*(?:nhở|tôi|mình|bạn|em|anh|chị|cho tôi|giùm)?\s*(?:trước|lại|thêm)?\s*(\d+)\s*(phút|p|h|giờ|tiếng)\b", 
             ]
         }
 
@@ -50,7 +56,10 @@ class RuleBasedExtractor:
         results = {
             "time_str": None, "date_str": None,
             "day_month": None, "session": None,
-            "special_type": None
+            "special_type": None,
+            
+            "reminder_minutes": 15,  # Mặc định là 15 phút
+            "reminder_str": None     # Mặc định là None
         }
         
         for p in self.patterns["time_absolute"]:
@@ -85,6 +94,20 @@ class RuleBasedExtractor:
             match = re.search(p, text, re.IGNORECASE)
             if match:
                 results["session"] = match.group(0)
+                break
+
+        for p in self.patterns["reminder"]:
+            match = re.search(p, text, re.IGNORECASE)
+            if match:
+                results["reminder_str"] = match.group(0) # Lưu cụm từ bắt được (VD: "nhắc trước 30p")
+                val = int(match.group(1))
+                unit = match.group(2).lower()
+                
+                # Quy đổi ra phút
+                if unit in ['h', 'giờ', 'tiếng']:
+                    results["reminder_minutes"] = val * 60
+                else:
+                    results["reminder_minutes"] = val
                 break
                 
         return results

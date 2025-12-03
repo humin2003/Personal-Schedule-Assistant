@@ -55,7 +55,7 @@ class NLPEngine:
         if time_obj:
             final_dt = date_obj.replace(hour=time_obj.hour, minute=time_obj.minute, second=0, microsecond=0)
             start_time_str = final_dt.isoformat()
-            end_time_str = (final_dt + timedelta(hours=1)).isoformat()
+            end_time_str = None
         else:
             start_time_str = date_obj.strftime("%Y-%m-%d")
             all_day = True 
@@ -72,8 +72,12 @@ class NLPEngine:
         # B. Thời gian
         if time_info['time_str']: items_to_remove.append(time_info['time_str'])
         if time_info['date_str']: items_to_remove.append(time_info['date_str'])
+
+        # C. Nhắc nhở
+        if time_info['reminder_str']: 
+            items_to_remove.append(time_info['reminder_str'])
         
-        # C. Buổi (Giữ lại nếu là hành động "Ăn trưa")
+        # D. Buổi (Giữ lại nếu là hành động "Ăn trưa")
         session = time_info['session']
         if session:
             normalized_text = remove_accents(clean_text)
@@ -91,42 +95,26 @@ class NLPEngine:
         # --- [CLEANUP LOGIC MỚI] ---
         
         # 1. Xóa Prefix
-        start_prefixes = [
-            "tôi có hẹn", "tôi muốn", "nhắc tôi", "nhớ là", "lên lịch", "ghi chú", 
-            "thêm sự kiện", "đặt lịch", "nhắc nhở"
-        ]
+        start_prefixes = ["tôi có hẹn", "tôi muốn", "nhắc tôi", "nhớ là", "lên lịch", "ghi chú", "thêm sự kiện", "đặt lịch", "nhắc nhở"]
         lower_title = title.lower().strip()
         for p in start_prefixes:
             if lower_title.startswith(p):
                 title = title[len(p):] 
-                break 
+                break
 
-        # 2. Xóa từ nối an toàn (Dangling Connectors)
-        # Các từ này chỉ bị xóa nếu nó KHÔNG đứng ở đầu câu (tránh xóa mất động từ chính)
-        # (?<!^) : Lookbehind phủ định -> Đảm bảo không phải đầu dòng
-        
-        # Nhóm 1: Từ nối thời gian/địa điểm (lúc, tại, ở, vào...) -> Xóa khá thoải mái
         title = re.sub(r"\b(lúc|vào|tại|ở|trong)\b", " ", title, flags=re.IGNORECASE)
-
-        # Nhóm 2: Từ nối chuyển động (đi, đến, về, qua) -> Cẩn thận
-        # Chỉ xóa nếu nó đứng lơ lửng, không xóa nếu ở đầu câu (VD: "Đi chơi" -> Giữ nguyên)
-        # Fix Case #14: "Bay [đi] chuyến" -> Xóa "đi"
         move_connectors = r"(?<!^)\b(đi|đến|về|qua)\b"
         title = re.sub(move_connectors, " ", title, flags=re.IGNORECASE)
-        
-        # Nhóm 3: Các từ rác khác (chuyến)
         title = re.sub(r"\b(chuyến|chuyen)\b", " ", title, flags=re.IGNORECASE)
-
-        # 3. Dọn dẹp khoảng trắng
         title = re.sub(r'\s+', ' ', title).strip().strip(",.-")
         if len(title) < 2: title = "Sự kiện mới"
 
         return {
             "event": title.capitalize(),
             "start_time": start_time_str,
-            "end_time": end_time_str,
+            "end_time": end_time_str,   # Giờ đây nó sẽ là None (hoặc giá trị nếu sau này code thêm)
             "location": final_location,
-            "reminder_minutes": 15,
+            "reminder_minutes": time_info['reminder_minutes'], 
             "is_all_day": all_day,
             "original_text": raw_text
         }
