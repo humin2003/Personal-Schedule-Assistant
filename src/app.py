@@ -42,8 +42,10 @@ nlp = st.session_state.nlp
 
 # --- BACKGROUND THREAD ---
 def run_scheduler():
+    # Thêm logic dừng thread nếu cần thiết (optional)
     while True:
         try:
+            # ... (Logic query DB và notify giữ nguyên) ...
             conn = sqlite3.connect('data/schedule.db')
             cursor = conn.cursor()
             now = datetime.now()
@@ -55,15 +57,24 @@ def run_scheduler():
                 
                 start_dt = datetime.fromisoformat(start_str)
                 rem_time = start_dt - timedelta(minutes=rem_min)
+                # Check chính xác trong khoảng 60s hiện tại
                 if rem_time <= now <= rem_time + timedelta(seconds=59):
                      notification.notify(title=f"Lời nhắc: {event_content}", message=f"Lúc {start_dt.strftime('%H:%M')} tại {loc}", app_name="Lời nhắc", timeout=10)
             conn.close()
         except Exception: pass
         time.sleep(60)
 
-if 'scheduler_started' not in st.session_state:
-    threading.Thread(target=run_scheduler, daemon=True).start()
-    st.session_state['scheduler_started'] = True
+# [MỚI] Kiểm tra thread bằng tên thay vì session_state
+thread_name = "Schedule_Notifier_Thread"
+is_thread_running = False
+for t in threading.enumerate():
+    if t.name == thread_name:
+        is_thread_running = True
+        break
+
+if not is_thread_running:
+    t = threading.Thread(target=run_scheduler, name=thread_name, daemon=True)
+    t.start()
 
 # --- HEADER ---
 st.title("Trợ lý Quản lý Lịch trình Thông minh")
@@ -84,22 +95,45 @@ with tab1:
                 # 1. Xử lý NLP
                 data = nlp.process(raw_text)
                 
-                # 2. Kiểm tra quá khứ
                 start_dt = datetime.fromisoformat(data['start_time'])
+                if data['end_time']:
+                    end_dt = datetime.fromisoformat(data['end_time'])
+                else:
+                    end_dt = None
+
                 now = datetime.now()
                 
-                # Logic: Nếu không phải cả ngày VÀ ở quá khứ -> BẬT CHẾ ĐỘ XÁC NHẬN
+                # [SỬA LỖI TẠI ĐÂY] Chỉ kiểm tra trùng lặp nếu có giờ kết thúc
+                overlap_events = []
+                if data['end_time']:
+                    overlap_events = db.check_overlap(data['start_time'], data['end_time'])
+                
+                warning_msg = ""
+                need_confirm = False
+                
+                # Case 1: Quá khứ
                 if not data.get('is_all_day') and start_dt < now:
-                    st.session_state.confirm_mode = True        # Bật cờ xác nhận
-                    st.session_state.pending_event_data = data  # Lưu tạm dữ liệu
-                    st.session_state.input_main = ""            # Xóa ô nhập cho gọn
+                    warning_msg += f"- Sự kiện diễn ra trong quá khứ ({start_dt.strftime('%H:%M %d/%m')}).\n"
+                    need_confirm = True
+                
+                # Case 2: Trùng lịch [MỚI]
+                if overlap_events:
+                    overlap_names = ", ".join([r[0] for r in overlap_events])
+                    warning_msg += f"- Trùng thời gian với: {overlap_names}.\n"
+                    need_confirm = True
+
+                if need_confirm:
+                    st.session_state.confirm_mode = True
+                    # Lưu thêm thông báo cảnh báo vào data tạm để hiển thị
+                    data['warning_msg'] = warning_msg 
+                    st.session_state.pending_event_data = data
+                    st.session_state.input_main = ""
                     
                 else:
-                    # Nếu là tương lai -> Thêm luôn như bình thường
                     db.add_event(data)
                     st.toast(f"Đã thêm: {data['event']}")
                     st.session_state.input_main = ""
-                    st.session_state.confirm_mode = False # Reset cờ
+                    st.session_state.confirm_mode = False
                     
             except ValueError as e:
                 st.toast(f"Lỗi: {str(e)}")
@@ -116,10 +150,12 @@ with tab1:
         pending_data = st.session_state.pending_event_data
         start_time_str = datetime.fromisoformat(pending_data['start_time']).strftime('%H:%M %d/%m/%Y')
         
-        # Hiện khung cảnh báo màu vàng
+        # Lấy thông báo cảnh báo từ bước trên (nếu có), nếu không có thì mặc định
+        msg = pending_data.get('warning_msg', f"Sự kiện diễn ra lúc {start_time_str} (Quá khứ).")
+
         with st.container(border=True):
-            st.warning(f"**Xác nhận:** Sự kiện **'{pending_data['event']}'** diễn ra lúc **{start_time_str}** (Quá khứ).")
-            st.write("Bạn có chắc chắn muốn thêm không?")
+            st.warning(f"**Cảnh báo:**\n{msg}") # Hiển thị rõ lý do trùng hoặc quá khứ
+            st.write(f"Bạn có chắc chắn muốn thêm sự kiện **'{pending_data['event']}'** không?")
             
             col_yes, col_no = st.columns(2)
             
@@ -391,111 +427,214 @@ with tab3:
     # --- 4. FORM SỬA (Logic cũ giữ nguyên hoặc copy lại nếu cần) ---
     st.write("#### Chỉnh sửa theo ID")
     event_id_input = st.number_input("Nhập ID sự kiện:", min_value=0, step=1)
+    # src/app.py - Đoạn Form Sửa (Khoảng dòng 230 trở đi)
+
     if event_id_input > 0:
         evt = db.get_event_by_id(event_id_input)
         if evt is not None:
             with st.expander(f"Sửa ID: {event_id_input}", expanded=True):
                 with st.form("edit_form"):
-                    # Hiển thị text gốc
                     st.text_area("Câu lệnh gốc:", value=evt['original_text'], disabled=True)
                     
                     c1, c2 = st.columns(2)
                     new_content = c1.text_input("Tên sự kiện", value=evt['event_content'])
                     new_loc = c2.text_input("Địa điểm", value=evt['location'])
                     
-                    is_all_day = st.checkbox("Cả ngày?", value=bool(evt.get('is_all_day', 0)))
+                    # --- [LOGIC MỚI BẮT ĐẦU TỪ ĐÂY] ---
                     
-                    # Xử lý datetime để hiển thị lên form
+                    # 1. Kiểm tra trạng thái hiện tại
+                    is_all_day_val = bool(evt.get('is_all_day', 0))
+                    current_end_is_null = (evt['end_time'] is None) # Check xem DB có đang là Null không
+
+                    # 2. Xử lý hiển thị thời gian
                     try:
                         cur_start = pd.to_datetime(evt['start_time'])
-                        cur_end = pd.to_datetime(evt['end_time']) if evt['end_time'] else cur_start + timedelta(hours=1)
+                        # Nếu end_time là None, tạo giờ giả định (+1h) để hiển thị lên UI cho đẹp
+                        # Nhưng ta sẽ dùng biến cờ 'current_end_is_null' để quyết định khi Lưu
+                        if evt['end_time']:
+                            cur_end = pd.to_datetime(evt['end_time'])
+                        else:
+                            cur_end = cur_start + timedelta(hours=1)
                         
-                        d_col, t1_col, t2_col, rem_col = st.columns(4)
+                        d_col, t1_col, t2_col = st.columns([2, 1.5, 1.5])
                         new_date = d_col.date_input("Ngày", value=cur_start.date())
-                        new_start = t1_col.time_input("Bắt đầu", value=cur_start.time(), disabled=is_all_day)
-                        new_end = t2_col.time_input("Kết thúc", value=cur_end.time(), disabled=is_all_day)
-                        new_rem = rem_col.number_input("Nhắc trước (phút)", value=evt['reminder_minutes'])
-                    except: pass
+                        
+                        # Checkbox Cả ngày
+                        is_all_day = st.checkbox("Sự kiện cả ngày", value=is_all_day_val)
+                        
+                        # [MỚI] Checkbox Không có giờ kết thúc
+                        # Nếu đang là Null -> Tick sẵn. Nếu user tick vào -> disable ô chọn giờ kết thúc
+                        no_end_time = st.checkbox("Chưa chốt giờ kết thúc (End Time = None)", value=current_end_is_null, disabled=is_all_day)
 
+                        new_start = t1_col.time_input("Bắt đầu", value=cur_start.time(), disabled=is_all_day)
+                        
+                        # Nếu chọn "Chưa chốt" -> Disable ô kết thúc
+                        new_end = t2_col.time_input("Kết thúc", value=cur_end.time(), disabled=(is_all_day or no_end_time))
+                        
+                        new_rem = st.number_input("Nhắc trước (phút)", value=evt['reminder_minutes'])
+                    except Exception as e:
+                        st.error(f"Lỗi parse data: {e}")
+
+                    # --- NÚT LƯU ---
                     if st.form_submit_button("Lưu thay đổi", type="primary", width='stretch'):
                         # Logic lưu thời gian
+                        final_start_iso = None
+                        final_end_iso = None
+
                         if is_all_day:
+                            # Cả ngày: Start = 00:00, End = 00:00 hôm sau (hoặc None tùy logic, ở đây giữ logic cũ +1 day)
                             s_dt = datetime.combine(new_date, datetime.min.time())
                             e_dt = s_dt + timedelta(days=1)
+                            final_start_iso = s_dt.isoformat()
+                            final_end_iso = e_dt.isoformat()
                         else:
+                            # Giờ thường
                             s_dt = datetime.combine(new_date, new_start)
-                            e_dt = datetime.combine(new_date, new_end)
-                            if e_dt <= s_dt: e_dt = s_dt + timedelta(hours=1)
+                            final_start_iso = s_dt.isoformat()
+                            
+                            # [QUAN TRỌNG] Logic quyết định lưu None hay Time
+                            if no_end_time:
+                                final_end_iso = None # <--- LƯU NULL VÀO DB
+                            else:
+                                e_dt = datetime.combine(new_date, new_end)
+                                if e_dt <= s_dt: e_dt = s_dt + timedelta(hours=1) # Auto fix nếu giờ kết thúc nhỏ hơn
+                                final_end_iso = e_dt.isoformat()
                         
-                        db.update_event(event_id_input, new_content, new_loc, s_dt.isoformat(), e_dt.isoformat(), new_rem, is_all_day)
-                        st.toast("Đã lưu!")
+                        # Gọi update với giá trị chuẩn (có thể là None)
+                        db.update_event(event_id_input, new_content, new_loc, final_start_iso, final_end_iso, new_rem, is_all_day)
+                        st.toast("Đã lưu thành công!")
                         time.sleep(1)
                         st.rerun()
 
-                    if st.form_submit_button("Xóa", type="secondary", width='stretch'):
+                    if st.form_submit_button("Xóa sự kiện", type="secondary", width='stretch'):
                         db.delete_event(event_id_input)
                         st.toast("Đã xóa!")
                         time.sleep(1)
                         st.rerun()
 
+def normalize_str(s):
+    """Chuẩn hóa chuỗi để so sánh (giống file test script)"""
+    if not s or pd.isna(s): return ""
+    s = str(s).strip().lower()
+    if s in ['none', 'chưa xác định', 'null', 'nan']: return ""
+    return s
+
+def run_test_row(nlp_engine, text, exp_time, exp_loc, exp_title):
+    """Chạy NLP cho 1 dòng và so sánh kết quả"""
+    try:
+        # 1. Chạy NLP
+        res = nlp_engine.process(text)
+        
+        # 2. Lấy Actual Time (Format lại thành HH:MM để so sánh)
+        if res.get('start_time'):
+            act_time = datetime.fromisoformat(res['start_time']).strftime('%H:%M')
+        else:
+            act_time = "None"
+            
+        act_loc = res.get('location', '')
+        act_title = res.get('event', '')
+        
+        # 3. So sánh (Logic Smart Match)
+        # Time
+        check_time = (normalize_str(exp_time) == normalize_str(act_time))
+        
+        # Location
+        n_exp_loc = normalize_str(exp_loc)
+        n_act_loc = normalize_str(act_loc)
+        check_loc = (n_exp_loc == n_act_loc) or (n_exp_loc in n_act_loc) or (n_act_loc in n_exp_loc)
+        
+        # Title
+        n_exp_title = normalize_str(exp_title)
+        n_act_title = normalize_str(act_title)
+        check_title = (n_exp_title == n_act_title) or (n_exp_title in n_act_title) or (n_act_title in n_exp_title)
+        
+        status = "PASS" if (check_time and check_loc and check_title) else "FAIL"
+        
+        return act_time, act_loc, act_title, status
+    except Exception:
+        return "Error", "Error", "Error", "FAIL"
+
 # --- TAB 4: BÁO CÁO KIỂM THỬ (DASHBOARD) ---
 with tab4:
     st.header("📊 NLP Accuracy Dashboard")
-    st.caption("Tải lên file `test_report.csv` để xem kết quả kiểm thử.")
+    st.caption("Tải lên file `test_cases_2.csv` (Input) hoặc file báo cáo kết quả.")
     
     uploaded_report = st.file_uploader("Chọn file CSV:", type=['csv'], label_visibility="collapsed")
     json_data = "[]" 
 
     if uploaded_report is not None:
         try:
-            # 1. Đọc file thông minh (tự nhận diện dấu phẩy/chấm phẩy)
+            # 1. Đọc file
             df_report = pd.read_csv(uploaded_report, encoding='utf-8-sig', sep=None, engine='python')
             
-            # Chuẩn hóa tên cột (về chữ thường, xóa khoảng trắng)
+            # Chuẩn hóa tên cột: xóa khoảng trắng, chuyển về chữ thường
             df_report.columns = df_report.columns.str.strip()
-            # Mapping tên cột linh hoạt
             cols = {c.lower(): c for c in df_report.columns}
             
-            # Tìm cột ID (ưu tiên 'id', 'ID')
+            # Tìm cột ID
             id_col = cols.get('id')
             
             if id_col is None:
                 st.error(f"❌ Không tìm thấy cột ID. Các cột có trong file: {list(df_report.columns)}")
             else:
-                st.success(f"Đã tải: {uploaded_report.name} ({len(df_report)} dòng)")
+                # Kiểm tra xem đây là file Input (chưa có kết quả) hay Report (đã có kết quả)
+                # File Input thường KHÔNG có cột 'status' hoặc 'result'
+                is_input_file = 'result' not in cols and 'kết quả' not in cols and 'status' not in cols
                 
+                if is_input_file:
+                    st.info("🚀 Đang chạy kiểm thử tự động trên file Input...")
+                    progress_bar = st.progress(0)
+                    total_rows = len(df_report)
+                else:
+                    st.success(f"Đã tải báo cáo: {uploaded_report.name}")
+
                 mapped_data = []
-                for _, row in df_report.iterrows():
+                
+                for index, row in df_report.iterrows():
                     row_id = row[id_col]
-                    
-                    # Bỏ qua dòng tổng kết
+                    # Bỏ qua dòng tổng kết (nếu có)
                     if pd.isna(row_id) or str(row_id).strip().upper().startswith('ACCURACY'): continue
                     
-                    # Helper tìm giá trị từ nhiều tên cột khác nhau (Tiếng Anh/Việt)
-                    def get_val(keys):
-                        for k in keys:
-                            if k.lower() in cols: return row[cols[k.lower()]]
-                        return ""
+                    # --- [CẬP NHẬT] MAPPING ĐÚNG TÊN CỘT CỦA BẠN ---
+                    # Ưu tiên: text, expected_time, expected_location, expected_title
+                    
+                    text = row.get(cols.get('text') or cols.get('input') or cols.get('câu lệnh (input)'), "")
+                    
+                    exp_time = row.get(cols.get('expected_time') or cols.get('exp time') or cols.get('mong đợi'), "")
+                    exp_loc = row.get(cols.get('expected_location') or cols.get('exp loc') or cols.get('mong đợi địa điểm'), "")
+                    exp_title = row.get(cols.get('expected_title') or cols.get('exp title') or cols.get('mong đợi sự kiện'), "")
+
+                    # Logic chạy test hoặc lấy kết quả
+                    if is_input_file:
+                        # Chạy NLP ngay lập tức
+                        act_time, act_loc, act_title, status = run_test_row(st.session_state.nlp, text, exp_time, exp_loc, exp_title)
+                        if index % 5 == 0: progress_bar.progress(min((index + 1) / total_rows, 1.0))
+                    else:
+                        # Lấy kết quả có sẵn từ file
+                        act_time = row.get(cols.get('actual_time') or cols.get('act time') or cols.get('thực tế'), "")
+                        act_loc = row.get(cols.get('actual_location') or cols.get('act loc') or cols.get('thực tế địa điểm'), "")
+                        act_title = row.get(cols.get('actual_title') or cols.get('act event') or cols.get('thực tế sự kiện'), "")
+                        status = row.get(cols.get('status') or cols.get('result') or cols.get('kết quả'), "FAIL")
 
                     mapped_data.append({
                         "id": row_id,
-                        "text": get_val(['Input', 'Câu lệnh (Input)', 'text']),
-                        "expected_time": get_val(['Exp Time', 'Expected Time', 'Mong đợi', 'expected_time']),
-                        "actual_time": get_val(['Act Time', 'Actual Time', 'Thực tế', 'actual_time']),
-                        "expected_loc": get_val(['Exp Loc', 'Expected Loc', 'Expected Location', 'expected_location']),
-                        "actual_loc": get_val(['Act Loc', 'Actual Loc', 'Actual Location', 'actual_location']),
-                        "expected_title": get_val(['Exp Event', 'Expected Event', 'Expected Title', 'expected_title']),
-                        "actual_title": get_val(['Act Event', 'Actual Event', 'Actual Title', 'actual_title']),
-                        "status": get_val(['Result', 'Kết quả', 'status']) or 'FAIL',
-                        "error": "" 
+                        "text": text,
+                        "expected_time": exp_time,
+                        "actual_time": act_time,
+                        "expected_loc": exp_loc,
+                        "actual_loc": act_loc,
+                        "expected_title": exp_title,
+                        "actual_title": act_title,
+                        "status": status
                     })
                 
+                if is_input_file: progress_bar.empty()
                 json_data = json.dumps(mapped_data, ensure_ascii=False)
                 
         except Exception as e:
-            st.error(f"❌ Lỗi đọc file: {e}")
+            st.error(f"❌ Lỗi xử lý file: {e}")
 
-    # Nội dung HTML Dashboard
+    # Nội dung HTML Dashboard (Cập nhật tiêu đề cột cho khớp)
     html_template = f"""
     <!DOCTYPE html>
     <html lang="vi">
@@ -526,16 +665,17 @@ with tab4:
             <div class="col-md-4"><div class="card p-4 h-100"><h5 class="mb-4"><i class="fas fa-filter me-2"></i>Bộ lọc</h5><div class="d-grid gap-3"><button class="btn btn-outline-primary" onclick="filterData('ALL')">Tất cả</button><button class="btn btn-outline-success" onclick="filterData('PASS')">Pass</button><button class="btn btn-outline-danger" onclick="filterData('FAIL')">Fail</button></div></div></div>
         </div>
         <div class="card">
-            <div class="card-header bg-white py-3"><h5><i class="fas fa-table me-2"></i>Chi tiết</h5></div>
+            <div class="card-header bg-white py-3"><h5><i class="fas fa-table me-2"></i>Chi tiết Kết Quả</h5></div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>ID</th><th style="width:25%">Input</th>
+                            <th>ID</th>
+                            <th style="width:25%">Text (Input)</th>
                             <th>Time <span style="font-size:0.8em; font-weight:normal">(Exp / Act)</span></th>
-                            <th>Loc <span style="font-size:0.8em; font-weight:normal">(Exp / Act)</span></th>
-                            <th>Event <span style="font-size:0.8em; font-weight:normal">(Exp / Act)</span></th>
-                            <th>Result</th>
+                            <th>Location <span style="font-size:0.8em; font-weight:normal">(Exp / Act)</span></th>
+                            <th>Title <span style="font-size:0.8em; font-weight:normal">(Exp / Act)</span></th>
+                            <th>Status</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody"></tbody>
@@ -547,38 +687,45 @@ with tab4:
         const testData = {json_data};
         let currentData = testData;
         let chartInstance = null;
+        
         function init() {{ calcMetrics(); renderTable(testData); if(testData.length>0) renderChart(); }}
+        
         function calcMetrics() {{
             const total=testData.length; const pass=testData.filter(d=>d.status==='PASS').length;
             document.getElementById('totalCases').innerText=total; document.getElementById('totalPass').innerText=pass;
             document.getElementById('totalFail').innerText=total-pass;
             document.getElementById('accuracy').innerText=total>0?((pass/total)*100).toFixed(2)+'%':'0%';
         }}
+        
         function renderTable(data) {{
             const tb=document.getElementById('tableBody'); tb.innerHTML='';
             data.forEach(r=>{{
                 const cls=r.status==='PASS'?'status-pass':'status-fail';
-                // Highlight nếu sai
-                const timeCls = r.expected_time !== r.actual_time ? 'text-danger fw-bold' : '';
-                const locCls = r.expected_loc !== r.actual_loc ? 'text-danger fw-bold' : '';
-                const titleCls = r.expected_title !== r.actual_title ? 'text-danger fw-bold' : '';
+                
+                // Highlight chữ đỏ nếu thực tế khác mong đợi
+                const timeCls = (r.expected_time && r.actual_time && r.expected_time !== r.actual_time) ? 'text-danger fw-bold' : '';
+                const locCls = (r.expected_loc && r.actual_loc && r.expected_loc.toLowerCase() !== r.actual_loc.toLowerCase()) ? 'text-danger fw-bold' : '';
                 
                 tb.innerHTML+=`<tr>
-                    <td class="fw-bold">#${{r.id}}</td><td>${{r.text}}</td>
-                    <td>${{r.expected_time}}<span class="text-muted-small ${{timeCls}}">${{r.actual_time}}</span></td>
-                    <td>${{r.expected_loc}}<span class="text-muted-small ${{locCls}}">${{r.actual_loc}}</span></td>
-                    <td>${{r.expected_title}}<span class="text-muted-small ${{titleCls}}">${{r.actual_title}}</span></td>
+                    <td class="fw-bold">#${{r.id}}</td>
+                    <td>${{r.text}}</td>
+                    <td>${{r.expected_time}}<br><span class="text-muted-small ${{timeCls}}">${{r.actual_time}}</span></td>
+                    <td>${{r.expected_loc}}<br><span class="text-muted-small ${{locCls}}">${{r.actual_loc}}</span></td>
+                    <td>${{r.expected_title}}<br><span class="text-muted-small">${{r.actual_title}}</span></td>
                     <td><span class="${{cls}}">${{r.status}}</span></td>
                 </tr>`;
             }});
         }}
+        
         function renderChart() {{
             const ctx=document.getElementById('resultChart').getContext('2d');
             const pass=testData.filter(d=>d.status==='PASS').length;
             if(chartInstance) chartInstance.destroy();
             chartInstance=new Chart(ctx,{{type:'doughnut',data:{{labels:['Pass','Fail'],datasets:[{{data:[pass,testData.length-pass],backgroundColor:['#198754','#dc3545'],borderWidth:0}}]}},options:{{responsive:true,maintainAspectRatio:false,cutout:'70%'}}}});
         }}
+        
         function filterData(t) {{ currentData=t==='ALL'?testData:testData.filter(d=>d.status===t); renderTable(currentData); }}
+        
         init();
     </script>
     </body>

@@ -48,10 +48,15 @@ class DatabaseManager:
         """
         is_all_day_int = 1 if data.get('is_all_day') else 0
         with self.get_connection() as conn:
+            # Python None sẽ tự động chuyển thành SQLite NULL
             conn.execute(query, (
-                data.get('event'), data.get('original_text'), data.get('location'),
-                data.get('start_time'), data.get('end_time'),
-                data.get('reminder_minutes', 0), is_all_day_int
+                data.get('event'), 
+                data.get('original_text'), 
+                data.get('location'),
+                data.get('start_time'), 
+                data.get('end_time'), # <--- Nếu cái này là None, DB sẽ lưu NULL. OK!
+                data.get('reminder_minutes', 0), 
+                is_all_day_int
             ))
             conn.commit()
     
@@ -68,7 +73,6 @@ class DatabaseManager:
             conn.execute(query, (event_id,))
             conn.commit()
 
-    # [CẬP NHẬT] Hàm update nhận thêm end_time
     def update_event(self, event_id, content, location, start_time, end_time, reminder, is_all_day):
         query = """
         UPDATE events 
@@ -77,6 +81,7 @@ class DatabaseManager:
         """
         is_all_day_int = 1 if is_all_day else 0
         with self.get_connection() as conn:
+            # end_time ở đây có thể là None
             conn.execute(query, (content, location, start_time, end_time, reminder, is_all_day_int, event_id))
             conn.commit()
     
@@ -86,3 +91,22 @@ class DatabaseManager:
         df = pd.read_sql_query(query, conn, params=(event_id,))
         conn.close()
         return df.iloc[0] if not df.empty else None
+    
+    def check_overlap(self, start_time_iso, end_time_iso):
+        """
+        Kiểm tra xem khoảng thời gian mới (start, end) có trùng với sự kiện nào không.
+        Logic trùng: (StartA <= EndB) AND (EndA >= StartB)
+        """
+        query = """
+        SELECT event_content, start_time, end_time FROM events 
+        WHERE (start_time < ? AND end_time > ?)
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        # Logic: Event cũ (start, end) trùng với Event mới (s_new, e_new)
+        # nếu Event cũ bắt đầu trước khi Event mới kết thúc
+        # VÀ Event cũ kết thúc sau khi Event mới bắt đầu.
+        cursor.execute(query, (end_time_iso, start_time_iso))
+        results = cursor.fetchall()
+        conn.close()
+        return results # Trả về list các sự kiện bị trùng

@@ -1,0 +1,70 @@
+﻿id,text,expected_time,expected_location,expected_title
+1,Họp team lúc 9h sáng mai tại phòng 302,09:00,Phòng 302,Họp team
+2,Đi siêu thị mua đồ ăn tối,00:00,Siêu Thị,Đi siêu thị mua đồ ăn tối
+3,Nhắc tôi uống thuốc trong 15 phút nữa,None,None,Uống thuốc
+4,Chạy bộ công viên lúc 5h30 chiều nay,17:30,Công Viên,Chạy bộ
+5,Gặp khách hàng tại Highland Coffee lúc 14h,14:00,Highland Coffee,Gặp khách hàng
+6,Làm báo cáo từ 8h đến 11h sáng nay,08:00,None,Làm báo cáo
+7,Đi xem phim rạp CGV lúc 19h30 tối mai,19:30,Rạp Cgv,Đi xem phim
+8,Gọi điện cho mẹ sau 30 phút nữa,None,None,Gọi điện cho mẹ
+9,Đá bóng sân vận động lúc 17h chiều thứ 7,17:00,Sân Vận Động,Đá bóng
+10,Sáng mai 7h đi bơi ở hồ bơi Lam Sơn,07:00,Hồ Bơi Lam Sơn,Đi bơi
+11,Đi thư viện học bài lúc 8h sáng,08:00,Thư Viện,Đi học bài
+12,Ăn trưa nhà hàng Phố Cổ lúc 11g30,11:30,Nhà Hàng Phố Cổ,Ăn trưa
+13,Hẹn bác sĩ nha khoa lúc 9h sáng ngày kia,09:00,Nha Khoa,Hẹn bác sĩ
+14,Đi nhà sách mua vở cho con,00:00,Nhà Sách,Đi mua vở cho con
+15,Tập gym ở California lúc 18h hàng ngày,18:00,California,Tập gym
+16,Nhắc tôi tắt bếp gas trong 5 phút nữa,None,None,Tắt bếp gas
+17,Họp phụ huynh lúc 8h sáng chủ nhật tuần sau,08:00,None,Họp phụ huynh
+18,Đi dạo hồ Gươm hóng gió tối nay,00:00,Hồ Gươm,Đi dạo hóng gió
+19,Nộp deadline lúc 12h đêm nay,00:00,None,Nộp deadline
+20,Bay đi Đà Nẵng chuyến 7h sáng mai,07:00,Đà Nẵng,Bay chuyến
+21,Cafe với đối tác tại The Coffee House lúc 3h chiều,15:00,The Coffee House,Cafe với đối tác
+22,Đi chợ mua rau củ,00:00,Chợ,Đi mua rau củ
+23,Xem bóng đá C1 lúc 2h45 sáng,02:45,None,Xem bóng đá C1
+24,Tổng kết tuần làm việc vào chiều thứ 6 lúc 16h,16:00,None,Tổng kết tuần làm việc
+25,Đi picnic công viên Yên Sở cuối tuần,00:00,Công Viên Yên Sở,Đi picnic
+26,Nhậu với bạn bè ở quán Ốc lúc 19h,19:00,Quán Ốc,Nhậu với bạn bè
+27,Đi bệnh viện khám sức khỏe sáng mai,00:00,Bệnh Viện,Đi khám sức khỏe
+28,Học nhóm tại trường lúc 9h đến 11h,09:00,Trường,Học nhóm
+29,Đi ngủ sớm lúc 22h30,22:30,None,Đi ngủ sớm
+30,Ra sân bay đón người thân lúc 10h sáng,10:00,Sân Bay,Ra đón người thân
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

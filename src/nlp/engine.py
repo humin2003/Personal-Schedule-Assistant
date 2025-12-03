@@ -34,7 +34,7 @@ class NLPEngine:
         return {
             "event": event_name.capitalize(),
             "start_time": start_time.isoformat(),
-            "end_time": end_time.isoformat(),
+            "end_time": end_time.isoformat() if end_time else None, 
             "location": location.title(),
             "reminder_minutes": reminder_minutes,
             "original_text": original_text,
