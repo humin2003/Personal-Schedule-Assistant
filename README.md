@@ -83,6 +83,7 @@ Giao diện chính được chia thành 4 thẻ chức năng:
 ---
 
 ## VI. Cấu trúc thư mục
+```text
 📦 Personal-Schedule-Assistant
  ┣ 📂 data/                 # Chứa database (schedule.db)
  ┣ 📂 src/                  # Mã nguồn chính
@@ -94,6 +95,7 @@ Giao diện chính được chia thành 4 thẻ chức năng:
  ┣ 📜 schedule_app.spec     # Cấu hình đóng gói PyInstaller (Quan trọng)
  ┣ 📜 requirements.txt      # Danh sách thư viện
  ┗ 📜 README.md             # Hướng dẫn sử dụng
+ ```
 
 ---
 
