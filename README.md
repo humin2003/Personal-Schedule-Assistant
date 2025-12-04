@@ -83,7 +83,6 @@ Giao diện chính được chia thành 4 thẻ chức năng:
 ---
 
 ## VI. Cấu trúc thư mục
-```text
 📦 Personal-Schedule-Assistant
  ┣ 📂 data/                 # Chứa database (schedule.db)
  ┣ 📂 src/                  # Mã nguồn chính
