@@ -6,3 +6,4 @@ python-dateutil
 plyer
 winotify
 pyinstaller
+streamlit-option-menu

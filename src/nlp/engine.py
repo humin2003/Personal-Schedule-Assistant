@@ -102,7 +102,7 @@ class NLPEngine:
                 title = title[len(p):] 
                 break
 
-        connectors_pattern = r"\b(lúc|vào|tại|ở|trong|phút|phut|p|nay|hôm)\b"
+        connectors_pattern = r"\b(lúc|vào|tại|ở|trong|phút|phut|p|nay|hôm|cuối)\b"
         title = re.sub(connectors_pattern, " ", title, flags=re.IGNORECASE)
 
         # Nhóm 2: Từ nối chuyển động (đi, đến, về, qua)

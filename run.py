@@ -4,6 +4,7 @@ import os
 from streamlit.web import cli as stcli
 
 def resolve_path(path):
+    # Hàm này giúp tìm file khi đã đóng gói vào exe (sys._MEIPASS)
     if getattr(sys, "frozen", False):
         basedir = sys._MEIPASS
     else:
@@ -11,14 +12,22 @@ def resolve_path(path):
     return os.path.join(basedir, path)
 
 if __name__ == '__main__':
-    # Trỏ đúng vào file app.py trong thư mục src
+    # 1. Cấu hình biến môi trường để Streamlit không cảnh báo lung tung
+    os.environ["STREAMLIT_SERVER_HEADLESS"] = "false"
+    os.environ["STREAMLIT_GLOBAL_DEVELOPMENT_MODE"] = "false"
+    os.environ["STREAMLIT_THEME_BASE"] = "dark" # Hoặc "light" tùy bạn
+
+    # 2. Xác định đường dẫn file app.py
+    # Lưu ý: "src" và "app.py" phải khớp với cấu trúc trong file spec
     app_path = resolve_path(os.path.join("src", "app.py"))
     
-    # Giả lập lệnh chạy: streamlit run src/app.py
+    # 3. Giả lập lệnh chạy
     sys.argv = [
         "streamlit",
         "run",
         app_path,
         "--global.developmentMode=false",
     ]
+    
+    # 4. Khởi chạy
     sys.exit(stcli.main())

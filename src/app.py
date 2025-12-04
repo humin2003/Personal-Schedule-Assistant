@@ -8,6 +8,7 @@ import threading
 import sqlite3
 import json
 import winsound
+from streamlit_option_menu import option_menu
 from datetime import datetime, timedelta
 from streamlit_calendar import calendar
 import streamlit.components.v1 as components # [MỚI] Thêm thư viện này để hiển thị HTML
@@ -93,11 +94,90 @@ if not is_thread_running:
 st.title("Trợ lý Quản lý Lịch trình Thông minh")
 st.markdown("---")
 
-# [CẬP NHẬT] Thêm Tab 4 vào danh sách
-tab1, tab2, tab3, tab4 = st.tabs(["Thêm sự kiện", "Xem Lịch Biểu", "Quản lý & Xuất file", "Báo cáo Kiểm thử"])
 
+def normalize_str(s):
+    """Chuẩn hóa chuỗi: Xóa dấu, chữ thường, xử lý NaN/None"""
+    if s is None or pd.isna(s): return ""
+    s = str(s).strip().lower()
+    if s in ['none', 'nan', 'chưa xác định', 'null', 'nat', '00:00']: return ""
+    return remove_accents(s)
+
+def run_test_row(nlp_engine, text, exp_time, exp_loc, exp_title):
+    try:
+        # 1. Chạy NLP
+        res = nlp_engine.process(text)
+        
+        # 2. Xử lý Thời gian (Fix lỗi Error đỏ)
+        act_time = "None"
+        raw_start = res.get('start_time')
+        
+        if raw_start:
+            try:
+                # Nếu là chuỗi ISO có giờ (VD: 2023-10-30T09:00:00)
+                if isinstance(raw_start, str) and 'T' in raw_start:
+                    act_time = datetime.fromisoformat(raw_start).strftime('%H:%M')
+                    
+                # [FIX] Nếu là sự kiện cả ngày (YYYY-MM-DD) -> Trả về "None" thay vì "00:00"
+                elif len(str(raw_start)) == 10:
+                    act_time = "None" 
+                    
+                else:
+                    act_time = str(raw_start)
+            except:
+                act_time = "Error"
+
+        # Lấy các trường khác
+        act_loc = res.get('location', '')
+        act_title = res.get('event', res.get('title', ''))
+
+        # 3. So sánh Thông Minh (Fix lỗi FAIL oan)
+        
+        # A. So sánh Giờ
+        n_exp_time = normalize_str(exp_time)
+        n_act_time = normalize_str(act_time)
+        
+        # Linh động: Coi "00:00", "" và "None" là như nhau
+        if n_exp_time == "" and n_act_time == "":
+            check_time = True
+        else:
+            check_time = (n_exp_time == n_act_time)
+        
+        # B. So sánh Địa điểm (Bỏ dấu, chứa trong nhau là ĐÚNG)
+        n_exp_loc = normalize_str(exp_loc)
+        n_act_loc = normalize_str(act_loc)
+        # VD: Exp="Cho", Act="Cho Dong Xuan" -> PASS
+        check_loc = (n_exp_loc in n_act_loc) or (n_act_loc in n_exp_loc)
+        
+        # C. So sánh Tiêu đề
+        n_exp_title = normalize_str(exp_title)
+        n_act_title = normalize_str(act_title)
+        check_title = (n_exp_title in n_act_title) or (n_act_title in n_exp_title)
+        
+        status = "PASS" if (check_time and check_loc and check_title) else "FAIL"
+        return act_time, act_loc, act_title, status
+
+    except Exception as e:
+        return "Crash", "Error", str(e), "FAIL"
+
+# selected_tab sẽ chứa tên của tab đang được chọn
+selected_tab = option_menu(
+    menu_title=None,  # Ẩn tiêu đề menu
+    options=["Thêm sự kiện", "Xem Lịch Biểu", "Quản Lý Dữ Liệu", "Công Cụ Kiểm Thử"],
+    orientation="horizontal", # Để menu nằm ngang giống Tabs
+    styles={
+        "container": {"padding": "0!important", "background-color": "#0E1117"}, # [SỬA] Màu nền trùng với màu nền web
+        "nav-link": {
+            "font-size": "16px", 
+            "text-align": "left", 
+            "margin":"0px", 
+            "--hover-color": "#262730", # [SỬA] Màu hover tối hơn
+            "color": "white" # [SỬA] Chữ màu trắng để nổi trên nền đen
+        },
+        "nav-link-selected": {"background-color": "#ff4b4b"},
+    }
+)
 # --- TAB 1: THÊM SỰ KIỆN ---
-with tab1:
+if selected_tab == "Thêm sự kiện":
     st.subheader("Nhập liệu ngôn ngữ tự nhiên")
     st.caption("Ví dụ: 'Họp team lúc 9h đến 11h sáng mai ở phòng 302', 'Mai đi chơi cả ngày'")
     
@@ -205,7 +285,7 @@ with tab1:
         st.dataframe(df_preview[['event_content', 'start_time', 'location']], hide_index=True, width='stretch')
 
 # --- TAB 2: LỊCH BIỂU ---
-with tab2:
+elif selected_tab == "Xem Lịch Biểu":
     df_events = db.get_all_events()
     
     c_view, _ = st.columns([2, 5])
@@ -346,8 +426,7 @@ with tab2:
                 """, unsafe_allow_html=True)
 
 # --- TAB 3: QUẢN LÝ & IMPORT/EXPORT ---
-with tab3:
-    st.subheader("Công cụ quản lý dữ liệu")
+elif selected_tab == "Quản Lý Dữ Liệu":
     
     col_backup, col_restore = st.columns(2)
     
@@ -389,10 +468,11 @@ with tab3:
                             # [FIX 2] Xử lý original_text bị mất hoặc thành số 0
                             raw_text = row.get('original_text', '')
                             # Nếu là số 0 hoặc NaN -> chuyển thành chuỗi rỗng
-                            if pd.isna(raw_text) or str(raw_text) == '0': 
-                                raw_text = ""
-                            else:
-                                raw_text = str(raw_text)
+                            if pd.isna(s_time): s_time = None
+                            else: s_time = pd.to_datetime(s_time).isoformat()
+
+                            if pd.isna(e_time): e_time = None
+                            else: e_time = pd.to_datetime(e_time).isoformat()
 
                             # Mapping dữ liệu
                             event_data = {
@@ -529,73 +609,8 @@ with tab3:
                         time.sleep(1)
                         st.rerun()
 
-def normalize_str(s):
-    """Chuẩn hóa chuỗi: Xóa dấu, chữ thường, xử lý NaN/None"""
-    if s is None or pd.isna(s): return ""
-    s = str(s).strip().lower()
-    if s in ['none', 'nan', 'chưa xác định', 'null', 'nat', '00:00']: return ""
-    return remove_accents(s)
-
-def run_test_row(nlp_engine, text, exp_time, exp_loc, exp_title):
-    try:
-        # 1. Chạy NLP
-        res = nlp_engine.process(text)
-        
-        # 2. Xử lý Thời gian (Fix lỗi Error đỏ)
-        act_time = "None"
-        raw_start = res.get('start_time')
-        
-        if raw_start:
-            try:
-                # Nếu là chuỗi ISO có giờ (VD: 2023-10-30T09:00:00)
-                if isinstance(raw_start, str) and 'T' in raw_start:
-                    act_time = datetime.fromisoformat(raw_start).strftime('%H:%M')
-                    
-                # [FIX] Nếu là sự kiện cả ngày (YYYY-MM-DD) -> Trả về "None" thay vì "00:00"
-                elif len(str(raw_start)) == 10:
-                    act_time = "None" 
-                    
-                else:
-                    act_time = str(raw_start)
-            except:
-                act_time = "Error"
-
-        # Lấy các trường khác
-        act_loc = res.get('location', '')
-        act_title = res.get('event', res.get('title', ''))
-
-        # 3. So sánh Thông Minh (Fix lỗi FAIL oan)
-        
-        # A. So sánh Giờ
-        n_exp_time = normalize_str(exp_time)
-        n_act_time = normalize_str(act_time)
-        
-        # Linh động: Coi "00:00", "" và "None" là như nhau
-        if n_exp_time == "" and n_act_time == "":
-            check_time = True
-        else:
-            check_time = (n_exp_time == n_act_time)
-        
-        # B. So sánh Địa điểm (Bỏ dấu, chứa trong nhau là ĐÚNG)
-        n_exp_loc = normalize_str(exp_loc)
-        n_act_loc = normalize_str(act_loc)
-        # VD: Exp="Cho", Act="Cho Dong Xuan" -> PASS
-        check_loc = (n_exp_loc in n_act_loc) or (n_act_loc in n_exp_loc)
-        
-        # C. So sánh Tiêu đề
-        n_exp_title = normalize_str(exp_title)
-        n_act_title = normalize_str(act_title)
-        check_title = (n_exp_title in n_act_title) or (n_act_title in n_exp_title)
-        
-        status = "PASS" if (check_time and check_loc and check_title) else "FAIL"
-        return act_time, act_loc, act_title, status
-
-    except Exception as e:
-        return "Crash", "Error", str(e), "FAIL"
-
 # --- TAB 4: BÁO CÁO KIỂM THỬ (DASHBOARD) ---
-with tab4:
-    st.header("NLP Accuracy Dashboard")
+elif selected_tab == "Công Cụ Kiểm Thử":
     st.caption("Tải lên file test cases trong folder tests để thực hiện kiểm thử.")
     
     uploaded_report = st.file_uploader("Chọn file CSV:", type=['csv'], label_visibility="collapsed")

@@ -3,12 +3,9 @@
 ## I. Giới thiệu
 Ứng dụng quản lý lịch trình thông minh trên Desktop (Windows), tích hợp **Xử lý Ngôn ngữ Tự nhiên (NLP) tiếng Việt**, giúp người dùng thêm sự kiện nhanh chóng bằng các câu lệnh đời thường thay vì nhập liệu thủ công phức tạp.
 
-**Sinh viên thực hiện:** Trần Hữu Minh
-
-**MSSV:** 3121410323
-
-**Môn học:** Đồ án chuyên ngành (2025-2026)
-
+**Sinh viên thực hiện:** Trần Hữu Minh  
+**MSSV:** 3121410323  
+**Môn học:** Đồ án chuyên ngành (2025-2026)  
 **Trạng thái:** Hoàn thiện (v1.0 - Production Ready)
 
 ---
@@ -29,7 +26,7 @@
 
 ## III. Công nghệ sử dụng
 * **Core:** Python 3.8+
-* **Giao diện (GUI):** Streamlit, Streamlit Calendar.
+* **Giao diện (GUI):** Streamlit, Streamlit Option Menu, Streamlit Calendar.
 * **NLP Engine:**
     * `Underthesea`: Nhận diện tên riêng, địa điểm (NER).
     * `Regex` & `Dateutil`: Xử lý logic thời gian, nhắc hẹn và quy tắc ngữ pháp tiếng Việt.
@@ -38,39 +35,54 @@
 
 ---
 
-## IV. Hướng dẫn Cài đặt & Sử dụng
-
+## IV. Hướng dẫn Cài đặt
 ### Cách 1: Dành cho Người dùng (Khuyên dùng)
 Bạn không cần cài đặt Python hay bất kỳ phần mềm nào khác.
-
 1.  Truy cập mục **[Releases](../../releases)** bên phải giao diện GitHub này.
-2.  Tải file nén `ScheduleAssistant.zip` (hoặc file `.exe`) của phiên bản mới nhất.
+2.  Tải file nén `ScheduleAssistant.zip` của phiên bản mới nhất.
 3.  Giải nén và chạy file `ScheduleAssistant.exe`.
     *(Lưu ý: Lần đầu khởi động có thể mất khoảng 10-15s để hệ thống giải nén tài nguyên).*
 
 ### Cách 2: Dành cho Lập trình viên (Chạy từ Source Code)
 Yêu cầu máy đã cài đặt Python và Git.
-
 1.  **Clone dự án:**
     ```bash
     git clone <link-repo-cua-ban>
     cd Personal-Schedule-Assistant
     ```
-
 2.  **Cài đặt thư viện:**
     ```bash
     pip install -r requirements.txt
     ```
-
 3.  **Khởi chạy ứng dụng:**
     ```bash
     streamlit run src/app.py
     ```
-    Ứng dụng sẽ mở trên trình duyệt tại: `http://localhost:8501`
 
 ---
 
-## V. Cấu trúc thư mục
+## V. Hướng dẫn Chức năng (Các Tabs)
+Giao diện chính được chia thành 4 thẻ chức năng:
+
+1.  **Thêm sự kiện (Add Event):**
+    * Nhập câu lệnh tiếng Việt tự nhiên (Ví dụ: *"Đi xem phim với bạn lúc 19h tối nay"*).
+    * Hệ thống tự động trích xuất thông tin và thêm vào lịch.
+
+2.  **Xem Lịch Biểu (Calendar View):**
+    * Quan sát trực quan các sự kiện theo Tháng/Tuần/Ngày.
+    * Hỗ trợ chuyển đổi linh hoạt giữa giao diện Lịch và Danh sách (List View).
+
+3.  **Quản lý Data (Data Management):**
+    * **Sao lưu/Khôi phục:** Xuất dữ liệu ra file `.json` hoặc nạp lại dữ liệu từ file backup.
+    * **Chỉnh sửa:** Tìm kiếm, sửa thông tin chi tiết hoặc xóa sự kiện theo ID.
+
+4.  **Báo cáo Test (NLP Dashboard):**
+    * Dành cho mục đích kiểm thử.
+    * Tải lên file `.csv` trong Folder `tests` chứa các test case để hệ thống tự động chạy và chấm điểm độ chính xác của thuật toán NLP.
+
+---
+
+## VI. Cấu trúc thư mục
 ```text
 📦 Personal-Schedule-Assistant
  ┣ 📂 data/                 # Chứa database (schedule.db)
@@ -83,21 +95,3 @@ Yêu cầu máy đã cài đặt Python và Git.
  ┣ 📜 schedule_app.spec     # Cấu hình đóng gói PyInstaller (Quan trọng)
  ┣ 📜 requirements.txt      # Danh sách thư viện
  ┗ 📜 README.md             # Hướng dẫn sử dụng
-
----
-
-
-## VI. Kết quả kiểm thử NLP
-Tổng số Test Case: Hơn 100 câu lệnh tiếng Việt đa dạng (3 file test_cases).
-
-Độ chính xác (Accuracy): Trên 90%
-
-Khả năng xử lý:
-
-✅ Thời gian tuyệt đối/tương đối (9h sáng, sáng mai, tuần sau).
-
-✅ Nhắc nhở (nhắc trước 30p).
-
-✅ Địa điểm (tại phòng 302, ở rạp CGV).
-
-✅ Loại bỏ từ nối rác (với, của, đi, đến...).
