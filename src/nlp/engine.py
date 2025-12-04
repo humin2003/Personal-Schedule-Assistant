@@ -102,10 +102,13 @@ class NLPEngine:
                 title = title[len(p):] 
                 break
 
-        title = re.sub(r"\b(lúc|vào|tại|ở|trong)\b", " ", title, flags=re.IGNORECASE)
-        move_connectors = r"(?<!^)\b(đi|đến|về|qua)\b"
+        connectors_pattern = r"\b(lúc|vào|tại|ở|trong|phút|phut|p|nay|hôm)\b"
+        title = re.sub(connectors_pattern, " ", title, flags=re.IGNORECASE)
+
+        # Nhóm 2: Từ nối chuyển động (đi, đến, về, qua)
+        # Chỉ xóa nếu nó đứng lơ lửng (không phải đầu câu)
+        move_connectors = r"(?<!^)\b(đi|đến|về|qua|)\b"
         title = re.sub(move_connectors, " ", title, flags=re.IGNORECASE)
-        title = re.sub(r"\b(chuyến|chuyen)\b", " ", title, flags=re.IGNORECASE)
         title = re.sub(r'\s+', ' ', title).strip().strip(",.-")
         if len(title) < 2: title = "Sự kiện mới"
 
