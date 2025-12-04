@@ -96,6 +96,8 @@ Giao diện chính được chia thành 4 thẻ chức năng:
  ┣ 📜 requirements.txt      # Danh sách thư viện
  ┗ 📜 README.md             # Hướng dẫn sử dụng
 
+---
+
 ## VII. Kết quả kiểm thử NLP
 
 Tổng số Test Case: Hơn 100 câu lệnh tiếng Việt đa dạng.
