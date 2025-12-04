@@ -95,7 +95,7 @@ class NLPEngine:
         # --- [CLEANUP LOGIC MỚI] ---
         
         # 1. Xóa Prefix
-        start_prefixes = ["tôi có hẹn", "tôi muốn", "nhắc tôi", "nhớ là", "lên lịch", "ghi chú", "thêm sự kiện", "đặt lịch", "nhắc nhở"]
+        start_prefixes = ["tôi muốn", "nhắc tôi", "nhớ là", "lên lịch", "ghi chú", "thêm sự kiện", "đặt lịch", "nhắc nhở"]
         lower_title = title.lower().strip()
         for p in start_prefixes:
             if lower_title.startswith(p):

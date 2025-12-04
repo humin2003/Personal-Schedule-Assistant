@@ -7,6 +7,7 @@ import time
 import threading
 import sqlite3
 import json
+import winsound
 from datetime import datetime, timedelta
 from streamlit_calendar import calendar
 import streamlit.components.v1 as components # [MỚI] Thêm thư viện này để hiển thị HTML
@@ -66,6 +67,11 @@ def run_scheduler():
                 rem_time = start_dt - timedelta(minutes=rem_min)
                 # Check chính xác trong khoảng 60s hiện tại
                 if rem_time <= now <= rem_time + timedelta(seconds=59):
+                     # [THÊM MỚI] Phát tiếng bíp (Tần số 1000Hz, trong 1000ms = 1 giây)
+                     try:
+                         winsound.Beep(1000, 1000) 
+                     except: pass 
+                     
                      notification.notify(title=f"Lời nhắc: {event_content}", message=f"Lúc {start_dt.strftime('%H:%M')} tại {loc}", app_name="Lời nhắc", timeout=10)
             conn.close()
         except Exception: pass
