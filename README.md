@@ -95,3 +95,19 @@ Giao diện chính được chia thành 4 thẻ chức năng:
  ┣ 📜 schedule_app.spec     # Cấu hình đóng gói PyInstaller (Quan trọng)
  ┣ 📜 requirements.txt      # Danh sách thư viện
  ┗ 📜 README.md             # Hướng dẫn sử dụng
+
+## VII. Kết quả kiểm thử NLP
+
+Tổng số Test Case: Hơn 100 câu lệnh tiếng Việt đa dạng.
+
+Độ chính xác (Accuracy): Trên 90%.
+
+Khả năng xử lý:
+
+✅ Thời gian tuyệt đối/tương đối (9h sáng, sáng mai, tuần sau).
+
+✅ Nhắc nhở (nhắc trước 30p).
+
+✅ Địa điểm (tại phòng 302, ở rạp CGV).
+
+✅ Loại bỏ từ nối rác (với, của, đi, đến...).
