@@ -6,6 +6,7 @@ from .ner import EntityExtractor
 from .rules import RuleBasedExtractor
 from .time_parser import TimeParser
 
+# Hàm loại bỏ dấu tiếng Việt
 def remove_accents(input_str):
     if not input_str: return ""
     s = unicodedata.normalize('NFD', str(input_str))
@@ -18,6 +19,7 @@ class NLPEngine:
         self.rules = RuleBasedExtractor()
         self.timer = TimeParser()
 
+    # Hàm xử lý chính
     def process(self, raw_text): 
         clean_text = self.processor.normalize(raw_text)
         
@@ -60,7 +62,7 @@ class NLPEngine:
             start_time_str = date_obj.strftime("%Y-%m-%d")
             all_day = True 
 
-        # 4. XỬ LÝ TIÊU ĐỀ (CLEAN TITLE)
+        # 4. Xử lý tiêu đề
         title = raw_text
         items_to_remove = []
         
@@ -77,7 +79,7 @@ class NLPEngine:
         if time_info['reminder_str']: 
             items_to_remove.append(time_info['reminder_str'])
         
-        # D. Buổi (Giữ lại nếu là hành động "Ăn trưa")
+        # D. Buổi
         session = time_info['session']
         if session:
             normalized_text = remove_accents(clean_text)
@@ -92,7 +94,7 @@ class NLPEngine:
             if item:
                 title = re.sub(re.escape(item), '', title, flags=re.IGNORECASE)
         
-        # --- [CLEANUP LOGIC MỚI] ---
+        # --- [CLEANUP] ---
         
         # 1. Xóa Prefix
         start_prefixes = ["tôi muốn", "nhắc tôi", "nhớ là", "lên lịch", "ghi chú", "thêm sự kiện", "đặt lịch", "nhắc nhở"]
@@ -105,17 +107,16 @@ class NLPEngine:
         connectors_pattern = r"\b(lúc|vào|tại|ở|trong|phút|phut|p|nay|hôm|cuối)\b"
         title = re.sub(connectors_pattern, " ", title, flags=re.IGNORECASE)
 
-        # Nhóm 2: Từ nối chuyển động (đi, đến, về, qua)
-        # Chỉ xóa nếu nó đứng lơ lửng (không phải đầu câu)
+        # 2: Từ nối chuyển động
         move_connectors = r"(?<!^)\b(đi|đến|về|qua|)\b"
         title = re.sub(move_connectors, " ", title, flags=re.IGNORECASE)
         title = re.sub(r'\s+', ' ', title).strip().strip(",.-")
         if len(title) < 2: title = "Sự kiện mới"
-
+        
         return {
             "event": title.capitalize(),
             "start_time": start_time_str,
-            "end_time": end_time_str,   # Giờ đây nó sẽ là None (hoặc giá trị nếu sau này code thêm)
+            "end_time": end_time_str,   
             "location": final_location,
             "reminder_minutes": time_info['reminder_minutes'], 
             "is_all_day": all_day,

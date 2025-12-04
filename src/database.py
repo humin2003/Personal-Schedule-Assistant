@@ -11,9 +11,11 @@ class DatabaseManager:
             self.db_path = db_path 
         self.init_db()
 
+    # Hàm kết nối DB
     def get_connection(self):
         return sqlite3.connect(self.db_path)
 
+    # Hàm khởi tạo DB và bảng nếu chưa có
     def init_db(self):
         query = """
         CREATE TABLE IF NOT EXISTS events (
@@ -41,6 +43,7 @@ class DatabaseManager:
                 conn.execute("ALTER TABLE events ADD COLUMN original_text TEXT DEFAULT ''")
             except: pass
 
+    # Hàm thêm sự kiện mới
     def add_event(self, data: dict):
         query = """
         INSERT INTO events (event_content, original_text, location, start_time, end_time, reminder_minutes, is_all_day)
@@ -59,7 +62,8 @@ class DatabaseManager:
                 is_all_day_int
             ))
             conn.commit()
-    
+
+    # Hàm lấy tất cả sự kiện
     def get_all_events(self):
         query = "SELECT id, event_content, start_time, end_time, location, reminder_minutes, is_all_day, original_text FROM events ORDER BY start_time ASC"
         conn = self.get_connection()
@@ -67,12 +71,14 @@ class DatabaseManager:
         conn.close()
         return df
     
+    # Hàm xóa sự kiện theo ID
     def delete_event(self, event_id):
         query = "DELETE FROM events WHERE id = ?"
         with self.get_connection() as conn:
             conn.execute(query, (event_id,))
             conn.commit()
 
+    # Hàm cập nhật sự kiện theo ID
     def update_event(self, event_id, content, location, start_time, end_time, reminder, is_all_day):
         query = """
         UPDATE events 
@@ -85,6 +91,7 @@ class DatabaseManager:
             conn.execute(query, (content, location, start_time, end_time, reminder, is_all_day_int, event_id))
             conn.commit()
     
+    # Hàm lấy sự kiện theo ID
     def get_event_by_id(self, event_id):
         query = "SELECT * FROM events WHERE id = ?"
         conn = self.get_connection()
@@ -92,21 +99,15 @@ class DatabaseManager:
         conn.close()
         return df.iloc[0] if not df.empty else None
     
+    # Hàm kiểm tra trùng lặp sự kiện
     def check_overlap(self, start_time_iso, end_time_iso):
-        """
-        Kiểm tra xem khoảng thời gian mới (start, end) có trùng với sự kiện nào không.
-        Logic trùng: (StartA <= EndB) AND (EndA >= StartB)
-        """
         query = """
         SELECT event_content, start_time, end_time FROM events 
         WHERE (start_time < ? AND end_time > ?)
         """
         conn = self.get_connection()
         cursor = conn.cursor()
-        # Logic: Event cũ (start, end) trùng với Event mới (s_new, e_new)
-        # nếu Event cũ bắt đầu trước khi Event mới kết thúc
-        # VÀ Event cũ kết thúc sau khi Event mới bắt đầu.
         cursor.execute(query, (end_time_iso, start_time_iso))
         results = cursor.fetchall()
         conn.close()
-        return results # Trả về list các sự kiện bị trùng
+        return results

@@ -5,6 +5,7 @@ class TimeParser:
     def __init__(self):
         pass
 
+    # Hàm phân tích thời gian
     def parse_time(self, time_str, session=None, special_type=None):
         if not time_str: return None, None 
         
@@ -55,6 +56,7 @@ class TimeParser:
 
         except: return None, f"Lỗi đọc giờ: {time_str}"
 
+    # Hàm phân tích ngày tháng
     def parse_date(self, date_str, day_month_tuple=None):
         today = datetime.now().replace(microsecond=0)
         if day_month_tuple:

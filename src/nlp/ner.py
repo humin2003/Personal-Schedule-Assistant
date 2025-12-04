@@ -2,6 +2,7 @@ from underthesea import ner
 import re
 import unicodedata
 
+# Hàm loại bỏ dấu tiếng Việt
 def remove_accents(input_str):
     if not input_str: return ""
     s = unicodedata.normalize('NFD', str(input_str))
@@ -36,14 +37,15 @@ class EntityExtractor:
         # 3. TỪ CHẶN
         self.stop_words_pattern = r"(?:lúc|vào|ngày|hôm|sáng|trưa|chiều|tối|đêm|mua|bán|xem|ăn|uống|thăm|học|chơi|ngủ|làm|về|đi|để|gặp|với|chuyến|$)"
 
+    # Hàm để trích xuất địa điểm
     def extract_location(self, text):
         if not text: return None
         
-        # Chiến thuật 1: Prefix
+        # Prefix 
         rule_prefix = self._extract_by_prefix(text)
         if rule_prefix: return rule_prefix.title()
 
-        # Chiến thuật 2: Common Location (Check cả không dấu)
+        # Common Location (Check cả không dấu)
         text_no_accent = remove_accents(text).lower()
         for loc in self.common_locations:
             loc_no_accent = remove_accents(loc).lower()
@@ -51,16 +53,17 @@ class EntityExtractor:
                re.search(rf"\b{loc_no_accent}\b", text_no_accent):
                 return loc.title()
 
-        # Chiến thuật 3: Preposition
+        # Preposition
         rule_prep = self._extract_by_preposition(text)
         if rule_prep: return rule_prep.title()
         
-        # Chiến thuật 4: AI Fallback
+        # AI Fallback
         ai_loc = self._extract_by_ai(text)
         if ai_loc: return ai_loc
 
         return None
 
+    # Hàm phụ trợ trích xuất theo tiền tố
     def _extract_by_prefix(self, text):
         prefixes = "|".join(self.place_prefixes)
         pattern = rf"\b({prefixes})(?:\s+(.*?))?(?=\s+{self.stop_words_pattern}|\s*$)"
@@ -79,6 +82,7 @@ class EntityExtractor:
             if self._is_valid(full_loc): return full_loc
         return None
     
+    # Hàm phụ trợ trích xuất theo giới từ
     def _extract_by_preposition(self, text):
         preps = r"(?:tại|ở|đến|về|qua|tai|o|den|ve|qua|trong|ngoài)" 
         pattern = rf"\b{preps}\s+(.*?)(?=\s+{self.stop_words_pattern}|\s*$)"
@@ -89,6 +93,7 @@ class EntityExtractor:
             if self._is_valid(loc): return loc
         return None
     
+    # Hàm phụ trợ trích xuất bằng AI
     def _extract_by_ai(self, text):
         try:
             tokens = ner(text)
@@ -110,6 +115,7 @@ class EntityExtractor:
             return valid_locs[0] if valid_locs else None
         except: return None
 
+    # Hàm kiểm tra tính hợp lệ của địa điểm
     def _is_valid(self, loc):
         if not loc: return False
         if len(loc.split()) > 10: return False 
@@ -139,6 +145,6 @@ class EntityExtractor:
         if is_prefix_word:
              if (loc_lower not in allow_standalone) and (loc_no_accent not in allow_standalone):
                 return False
-
+        
         if re.search(r"\b(hôm|nay|mai|mốt|giờ|phút)\b", loc_lower): return False
         return True

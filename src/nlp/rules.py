@@ -45,21 +45,21 @@ class RuleBasedExtractor:
                 r"\b(sáng|trưa|chiều|tối|đêm|sang|trua|chieu|toi|dem)\b"
             ],
 
+            # 6. Nhắc nhở
             "reminder": [
-                # Cấu trúc: (hãy)? (nhắc/báo/hẹn) (nhở/tôi/mình/...) (trước/lại/thêm)? (số) (đơn vị)
-                # VD: "hãy nhắc tôi trước 15 phút", "nhắc mình 30p", "báo trước 1h"
                 r"\b(?:hãy\s+)?(?:nhắc|báo|hẹn|thông báo)\s*(?:nhở|tôi|mình|bạn|em|anh|chị|cho tôi|giùm)?\s*(?:trước|lại|thêm)?\s*(\d+)\s*(phút|p|h|giờ|tiếng)\b", 
             ]
         }
 
+    # Hàm trích xuất thông tin theo quy tắc
     def extract(self, text):
         results = {
             "time_str": None, "date_str": None,
             "day_month": None, "session": None,
             "special_type": None,
             
-            "reminder_minutes": 15,  # Mặc định là 15 phút
-            "reminder_str": None     # Mặc định là None
+            "reminder_minutes": 15,  
+            "reminder_str": None    
         }
         
         for p in self.patterns["time_absolute"]:

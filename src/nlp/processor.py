@@ -18,6 +18,7 @@ class TextProcessor:
             r"\bdem\b": "đêm"
         }
 
+    # Hàm chuẩn hóa văn bản
     def normalize(self, text):
         if not text:
             return ""
@@ -31,5 +32,6 @@ class TextProcessor:
             
         return text
 
+    # Hàm phân đoạn từ
     def segment(self, text):
         return word_tokenize(text, format="text")

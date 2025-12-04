@@ -11,7 +11,7 @@ import winsound
 from streamlit_option_menu import option_menu
 from datetime import datetime, timedelta
 from streamlit_calendar import calendar
-import streamlit.components.v1 as components # [MỚI] Thêm thư viện này để hiển thị HTML
+import streamlit.components.v1 as components
 
 # --- CONFIG ---
 st.set_page_config(page_title="Trợ lý Lịch trình AI", layout="wide")
@@ -28,7 +28,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-# --- [QUAN TRỌNG] IMPORT MODULES ---
+# --- IMPORT MODULES ---
 from src.nlp import NLPEngine
 from src.database import DatabaseManager
 
@@ -36,25 +36,25 @@ from src.database import DatabaseManager
 if 'db' not in st.session_state: st.session_state.db = DatabaseManager()
 if 'nlp' not in st.session_state: st.session_state.nlp = NLPEngine()
 
-# [MỚI] Biến để lưu trạng thái chờ xác nhận
 if 'confirm_mode' not in st.session_state: st.session_state.confirm_mode = False
 if 'pending_event_data' not in st.session_state: st.session_state.pending_event_data = None
 
 db = st.session_state.db
 nlp = st.session_state.nlp
 
+
+# Hàm xóa dấu tiếng Việt
 def remove_accents(input_str):
     """Xóa dấu tiếng Việt"""
     if not input_str: return ""
     s = unicodedata.normalize('NFD', str(input_str))
     return ''.join(c for c in s if unicodedata.category(c) != 'Mn')
 
-# --- BACKGROUND THREAD ---
+# Hàm chạy thread kiểm tra lịch và thông báo
 def run_scheduler():
     # Thêm logic dừng thread nếu cần thiết (optional)
     while True:
         try:
-            # ... (Logic query DB và notify giữ nguyên) ...
             conn = sqlite3.connect('data/schedule.db')
             cursor = conn.cursor()
             now = datetime.now()
@@ -78,7 +78,7 @@ def run_scheduler():
         except Exception: pass
         time.sleep(60)
 
-# [MỚI] Kiểm tra thread bằng tên thay vì session_state
+# Kiểm tra thread bằng tên thay vì session_state
 thread_name = "Schedule_Notifier_Thread"
 is_thread_running = False
 for t in threading.enumerate():
@@ -94,7 +94,7 @@ if not is_thread_running:
 st.title("Trợ lý Quản lý Lịch trình Thông minh")
 st.markdown("---")
 
-
+# Hàm chuẩn hóa chuỗi trước khi so sánh trong test
 def normalize_str(s):
     """Chuẩn hóa chuỗi: Xóa dấu, chữ thường, xử lý NaN/None"""
     if s is None or pd.isna(s): return ""
@@ -102,6 +102,7 @@ def normalize_str(s):
     if s in ['none', 'nan', 'chưa xác định', 'null', 'nat', '00:00']: return ""
     return remove_accents(s)
 
+# Hàm chạy test trên 1 dòng
 def run_test_row(nlp_engine, text, exp_time, exp_loc, exp_title):
     try:
         # 1. Chạy NLP
@@ -163,15 +164,15 @@ def run_test_row(nlp_engine, text, exp_time, exp_loc, exp_title):
 selected_tab = option_menu(
     menu_title=None,  # Ẩn tiêu đề menu
     options=["Thêm sự kiện", "Xem Lịch Biểu", "Quản Lý Dữ Liệu", "Công Cụ Kiểm Thử"],
-    orientation="horizontal", # Để menu nằm ngang giống Tabs
+    orientation="horizontal", 
     styles={
-        "container": {"padding": "0!important", "background-color": "#0E1117"}, # [SỬA] Màu nền trùng với màu nền web
+        "container": {"padding": "0!important", "background-color": "#0E1117"},
         "nav-link": {
             "font-size": "16px", 
             "text-align": "left", 
             "margin":"0px", 
-            "--hover-color": "#262730", # [SỬA] Màu hover tối hơn
-            "color": "white" # [SỬA] Chữ màu trắng để nổi trên nền đen
+            "--hover-color": "#262730",
+            "color": "white"
         },
         "nav-link-selected": {"background-color": "#ff4b4b"},
     }
@@ -186,12 +187,9 @@ if selected_tab == "Thêm sự kiện":
         if raw_text.strip():
             try:
                 # 1. Xử lý NLP (Dùng engine mới)
-                # Hàm process giờ đây đã trả về đúng các key mà DB của Minh cần
-                # (event, start_time, end_time, location...)
                 data = nlp.process(raw_text)
                 
                 # Chuyển đổi chuỗi ISO về datetime để so sánh logic
-                # Lưu ý: Engine mới trả về 'start_time' dạng String ISO
                 if len(data['start_time']) == 10: # Dạng YYYY-MM-DD (All day)
                      start_dt = datetime.strptime(data['start_time'], "%Y-%m-%d")
                 else:
@@ -199,7 +197,7 @@ if selected_tab == "Thêm sự kiện":
 
                 now = datetime.now()
                 
-                # Logic cảnh báo trùng lặp & Quá khứ (Giữ nguyên của Minh)
+                # Logic cảnh báo trùng lặp & Quá khứ
                 overlap_events = []
                 if data['end_time']:
                     overlap_events = db.check_overlap(data['start_time'], data['end_time'])
@@ -230,7 +228,6 @@ if selected_tab == "Thêm sự kiện":
                     st.session_state.confirm_mode = False
                     
             except ValueError as e:
-                # Engine mới sẽ raise ValueError nếu giờ sai, bắt ở đây là chuẩn
                 st.toast(f"Lỗi: {str(e)}")
             except Exception as e:
                 st.error(f"Lỗi hệ thống: {str(e)}")
@@ -242,7 +239,7 @@ if selected_tab == "Thêm sự kiện":
         st.write("")
         st.button("Thêm ngay", type="primary", on_click=handle_add_event, width='stretch')
 
-    # --- [MỚI] GIAO DIỆN XÁC NHẬN (Hiện ra khi cần confirm) ---
+    # --- GIAO DIỆN XÁC NHẬN (Hiện ra khi cần confirm) ---
     if st.session_state.confirm_mode and st.session_state.pending_event_data:
         pending_data = st.session_state.pending_event_data
         start_time_str = datetime.fromisoformat(pending_data['start_time']).strftime('%H:%M %d/%m/%Y')
@@ -265,7 +262,7 @@ if selected_tab == "Thêm sự kiện":
                 # Reset trạng thái
                 st.session_state.confirm_mode = False
                 st.session_state.pending_event_data = None
-                st.rerun() # Chạy lại để ẩn khung xác nhận
+                st.rerun() 
             
             # Nút HỦY
             if col_no.button("Không, hủy bỏ", width='stretch'):
@@ -298,7 +295,6 @@ elif selected_tab == "Xem Lịch Biểu":
             try:
                 event_dt = pd.to_datetime(row['start_time'])
                 iso_start = event_dt.strftime("%Y-%m-%dT%H:%M:%S")
-                # Xử lý end_time
                 if row['end_time']:
                     end_dt = pd.to_datetime(row['end_time'])
                 else:
@@ -306,6 +302,7 @@ elif selected_tab == "Xem Lịch Biểu":
                 iso_end = end_dt.strftime("%Y-%m-%dT%H:%M:%S")
                 
                 is_past = event_dt < datetime.now()
+                # Màu sự kiện vẫn giữ để phân biệt quá khứ/tương lai, nhưng không ảnh hưởng nền
                 color = "#6c757d" if is_past else "#3a86ff"
                 is_all_day_db = bool(row.get('is_all_day', 0))
                 title_text = row['event_content'].strip().capitalize()
@@ -335,68 +332,32 @@ elif selected_tab == "Xem Lịch Biểu":
             "initialView": "dayGridMonth",
             "eventDisplay": "block",
             "height": 700,
-            "slotMinTime": "06:00:00",
-            "slotMaxTime": "24:00:00",
-            "allDaySlot": True,
-            "navLinks": True,
-            
-            # [FIX] Đổi tên All Day và Format 24h
-            "allDayText": "All Day",
-            "slotLabelFormat": {
-                "hour": "2-digit", "minute": "2-digit", "hour12": False, "meridiem": False
-            },
-            "eventTimeFormat": {
-                "hour": "2-digit", "minute": "2-digit", "hour12": False
-            }
+            # Config hiển thị giờ 24h
+            "slotLabelFormat": {"hour": "2-digit", "minute": "2-digit", "hour12": False, "meridiem": False},
+            "eventTimeFormat": {"hour": "2-digit", "minute": "2-digit", "hour12": False}
         }
 
+        # [SỬA ĐỔI QUAN TRỌNG]
+        # Xóa bỏ các dòng background-color và color cứng trong CSS.
+        # Chỉ giữ lại định dạng font và border radius để gọn gàng.
         custom_css = """
             .fc {
                 font-family: 'Segoe UI', sans-serif;
-                background-color: #1E1E1E;
-                color: #FFFFFF;
             }
-            .fc-scrollgrid {
-                border: 1px solid #444 !important;
-                border-radius: 12px !important;
-                overflow: hidden;
-            }
-            .fc-theme-standard td, .fc-theme-standard th {
-                border-color: #383838 !important;
-            }
-            .fc-col-header-cell {
-                background-color: #2D2D2D;
-                padding: 12px 0 !important;
-            }
-            .fc-col-header-cell-cushion {
-                color: #FF4B4B !important;
-                font-weight: 700;
-                text-transform: uppercase;
-                font-size: 0.9rem;
-            }
-            .fc-button {
-                background-color: #2D2D2D !important;
-                border: 1px solid #444 !important;
-                text-transform: capitalize !important;
-                font-weight: 600 !important;
-                border-radius: 8px !important;
-                padding: 6px 16px !important;
-                box-shadow: none !important;
-            }
-            .fc-button:hover { background-color: #3E3E3E !important; }
-            .fc-button-active {
-                background-color: #FF4B4B !important;
-                border-color: #FF4B4B !important;
-                color: white !important;
-            }
-            .fc-toolbar-title { font-size: 1.5rem !important; font-weight: 700; color: white; }
-            .fc-day-today { background-color: rgba(255, 75, 75, 0.08) !important; }
             .fc-event {
                 border-radius: 4px !important;
-                padding: 2px 4px;
-                font-size: 0.85rem;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 border: none !important;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            }
+            .fc-toolbar-title {
+                font-size: 1.5rem !important;
+                font-weight: 700;
+                /* Xóa color: white để tự động theo theme */
+            }
+            .fc-col-header-cell-cushion {
+                text-transform: uppercase;
+                font-size: 0.9rem;
+                font-weight: 700;
             }
         """
 
@@ -412,18 +373,18 @@ elif selected_tab == "Xem Lịch Biểu":
                 is_all_day_db = bool(row.get('is_all_day', 0))
                 time_display = "🟦 Cả ngày" if is_all_day_db else f"{event_dt.strftime('%H:%M')}"
                 
-                st.markdown(f"""
-                <div style="background-color: #262730; padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <div style="font-size: 1.1em; font-weight: bold; color: #FFF; margin-bottom: 4px;">{row['event_content']}</div>
-                        <div style="color: #AAA; font-size: 0.9em;"> Địa điểm: {row['location']}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="color: #FF4B4B; font-weight: bold;">{event_dt.strftime('%d/%m/%Y')}</div>
-                        <div style="color: #FFBD45; font-size: 0.9em;">{time_display}</div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                # [SỬA ĐỔI QUAN TRỌNG] 
+                # Thay thẻ HTML cứng (div style=...) bằng st.container(border=True)
+                # Component này sẽ tự động Trắng khi Light Mode và Đen khi Dark Mode.
+                with st.container(border=True):
+                    c1, c2 = st.columns([5, 2])
+                    with c1:
+                        st.markdown(f"**{row['event_content']}**")
+                        if row['location']:
+                            st.caption(f"📍 {row['location']}")
+                    with c2:
+                        st.markdown(f"<div style='text-align: right; color: #ff4b4b; font-weight: bold;'>{event_dt.strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='text-align: right; color: gray; font-size: 0.9em;'>{time_display}</div>", unsafe_allow_html=True)
 
 # --- TAB 3: QUẢN LÝ & IMPORT/EXPORT ---
 elif selected_tab == "Quản Lý Dữ Liệu":
@@ -442,7 +403,7 @@ elif selected_tab == "Quản Lý Dữ Liệu":
         else:
             st.info("Chưa có dữ liệu.")
 
-    # --- 2. NHẬP DỮ LIỆU (RESTORE - FIX) ---
+    # --- 2. NHẬP DỮ LIỆU ---
     with col_restore:
         st.markdown("#### Khôi phục dữ liệu")
         st.caption("Nhập file JSON để thêm lại sự kiện.")
@@ -459,13 +420,11 @@ elif selected_tab == "Quản Lý Dữ Liệu":
                     else:
                         success_count = 0
                         for _, row in df_new.iterrows():
-                            # [FIX 1] Xử lý lỗi Timestamp
                             s_time = row.get('start_time')
                             e_time = row.get('end_time')
                             if isinstance(s_time, pd.Timestamp): s_time = s_time.isoformat()
                             if isinstance(e_time, pd.Timestamp): e_time = e_time.isoformat()
 
-                            # [FIX 2] Xử lý original_text bị mất hoặc thành số 0
                             raw_text = row.get('original_text', '')
                             # Nếu là số 0 hoặc NaN -> chuyển thành chuỗi rỗng
                             if pd.isna(s_time): s_time = None
@@ -495,10 +454,10 @@ elif selected_tab == "Quản Lý Dữ Liệu":
                     st.error(f"Lỗi: {e}")
 
     st.markdown("---")
-    # --- 3. BẢNG DỮ LIỆU & TÌM KIẾM (Đã nâng cấp) ---
+    # --- 3. BẢNG DỮ LIỆU & TÌM KIẾM ---
     st.markdown("### Dữ liệu hiện tại")
     
-    # [MỚI] Thanh tìm kiếm
+    # Thanh tìm kiếm
     c_search, c_total = st.columns([4, 1])
     with c_search:
         search_term = st.text_input("Tìm kiếm nhanh:", placeholder="Nhập tên sự kiện, hoặc địa điểm", label_visibility="collapsed")
@@ -521,10 +480,9 @@ elif selected_tab == "Quản Lý Dữ Liệu":
     # --- 3. BẢNG DỮ LIỆU ---
     st.dataframe(filtered_df, width='stretch', height=300, hide_index=True)
 
-    # --- 4. FORM SỬA (Logic cũ giữ nguyên hoặc copy lại nếu cần) ---
+    # --- 4. FORM SỬA ---
     st.write("#### Chỉnh sửa theo ID")
     event_id_input = st.number_input("Nhập ID sự kiện:", min_value=0, step=1)
-    # src/app.py - Đoạn Form Sửa (Khoảng dòng 230 trở đi)
 
     if event_id_input > 0:
         evt = db.get_event_by_id(event_id_input)
@@ -536,9 +494,7 @@ elif selected_tab == "Quản Lý Dữ Liệu":
                     c1, c2 = st.columns(2)
                     new_content = c1.text_input("Tên sự kiện", value=evt['event_content'])
                     new_loc = c2.text_input("Địa điểm", value=evt['location'])
-                    
-                    # --- [LOGIC MỚI BẮT ĐẦU TỪ ĐÂY] ---
-                    
+                                        
                     # 1. Kiểm tra trạng thái hiện tại
                     is_all_day_val = bool(evt.get('is_all_day', 0))
                     current_end_is_null = (evt['end_time'] is None) # Check xem DB có đang là Null không
@@ -546,8 +502,7 @@ elif selected_tab == "Quản Lý Dữ Liệu":
                     # 2. Xử lý hiển thị thời gian
                     try:
                         cur_start = pd.to_datetime(evt['start_time'])
-                        # Nếu end_time là None, tạo giờ giả định (+1h) để hiển thị lên UI cho đẹp
-                        # Nhưng ta sẽ dùng biến cờ 'current_end_is_null' để quyết định khi Lưu
+                        # Nếu end_time là None, tạo giờ giả định (+1h) để hiển thị
                         if evt['end_time']:
                             cur_end = pd.to_datetime(evt['end_time'])
                         else:
@@ -559,7 +514,7 @@ elif selected_tab == "Quản Lý Dữ Liệu":
                         # Checkbox Cả ngày
                         is_all_day = st.checkbox("Sự kiện cả ngày", value=is_all_day_val)
                         
-                        # [MỚI] Checkbox Không có giờ kết thúc
+                        # Checkbox Không có giờ kết thúc
                         # Nếu đang là Null -> Tick sẵn. Nếu user tick vào -> disable ô chọn giờ kết thúc
                         no_end_time = st.checkbox("Chưa chốt giờ kết thúc (End Time = None)", value=current_end_is_null, disabled=is_all_day)
 
@@ -579,7 +534,7 @@ elif selected_tab == "Quản Lý Dữ Liệu":
                         final_end_iso = None
 
                         if is_all_day:
-                            # Cả ngày: Start = 00:00, End = 00:00 hôm sau (hoặc None tùy logic, ở đây giữ logic cũ +1 day)
+                            # Cả ngày: Start = 00:00, End = 00:00 hôm sau
                             s_dt = datetime.combine(new_date, datetime.min.time())
                             e_dt = s_dt + timedelta(days=1)
                             final_start_iso = s_dt.isoformat()
@@ -589,9 +544,9 @@ elif selected_tab == "Quản Lý Dữ Liệu":
                             s_dt = datetime.combine(new_date, new_start)
                             final_start_iso = s_dt.isoformat()
                             
-                            # [QUAN TRỌNG] Logic quyết định lưu None hay Time
+                            # Logic quyết định lưu None hay Time
                             if no_end_time:
-                                final_end_iso = None # <--- LƯU NULL VÀO DB
+                                final_end_iso = None 
                             else:
                                 e_dt = datetime.combine(new_date, new_end)
                                 if e_dt <= s_dt: e_dt = s_dt + timedelta(hours=1) # Auto fix nếu giờ kết thúc nhỏ hơn
@@ -609,7 +564,7 @@ elif selected_tab == "Quản Lý Dữ Liệu":
                         time.sleep(1)
                         st.rerun()
 
-# --- TAB 4: BÁO CÁO KIỂM THỬ (DASHBOARD) ---
+# --- TAB 4: BÁO CÁO KIỂM THỬ ---
 elif selected_tab == "Công Cụ Kiểm Thử":
     st.caption("Tải lên file test cases trong folder tests để thực hiện kiểm thử.")
     
@@ -632,7 +587,6 @@ elif selected_tab == "Công Cụ Kiểm Thử":
                 st.error(f"Không tìm thấy cột ID. Các cột có trong file: {list(df_report.columns)}")
             else:
                 # Kiểm tra xem đây là file Input (chưa có kết quả) hay Report (đã có kết quả)
-                # File Input thường KHÔNG có cột 'status' hoặc 'result'
                 is_input_file = 'result' not in cols and 'kết quả' not in cols and 'status' not in cols
                 
                 if is_input_file:
@@ -646,14 +600,8 @@ elif selected_tab == "Công Cụ Kiểm Thử":
                 
                 for index, row in df_report.iterrows():
                     row_id = row[id_col]
-                    # Bỏ qua dòng tổng kết (nếu có)
                     if pd.isna(row_id) or str(row_id).strip().upper().startswith('ACCURACY'): continue
-                    
-                    # --- [CẬP NHẬT] MAPPING ĐÚNG TÊN CỘT CỦA BẠN ---
-                    # Ưu tiên: text, expected_time, expected_location, expected_title
-                    
                     text = row.get(cols.get('text') or cols.get('input') or cols.get('câu lệnh (input)'), "")
-                    
                     exp_time = row.get(cols.get('expected_time') or cols.get('exp time') or cols.get('mong đợi'), "")
                     exp_loc = row.get(cols.get('expected_location') or cols.get('exp loc') or cols.get('mong đợi địa điểm'), "")
                     exp_title = row.get(cols.get('expected_title') or cols.get('exp title') or cols.get('mong đợi sự kiện'), "")
@@ -688,7 +636,7 @@ elif selected_tab == "Công Cụ Kiểm Thử":
         except Exception as e:
             st.error(f"Lỗi xử lý file: {e}")
 
-    # Nội dung HTML Dashboard (Cập nhật tiêu đề cột cho khớp)
+    # Nội dung HTML Dashboard
     html_template = f"""
     <!DOCTYPE html>
     <html lang="vi">
