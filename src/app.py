@@ -646,7 +646,9 @@ elif selected_tab == "Công Cụ Kiểm Thử":
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <style>
-            /* --- GIAO DIỆN LIGHT MODE (MẶC ĐỊNH) --- */
+            /* ========================================= */
+            /* 1. CẤU HÌNH MẶC ĐỊNH (LIGHT MODE)         */
+            /* ========================================= */
             body {{ background-color: transparent; font-family: 'Segoe UI', sans-serif; color: #31333F; }}
             
             .card {{ 
@@ -654,19 +656,26 @@ elif selected_tab == "Công Cụ Kiểm Thử":
                 box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
                 border-radius: 12px; 
                 margin-bottom: 20px; 
-                background-color: #ffffff; 
+                background-color: #ffffff; /* Nền trắng cho Light Mode */
             }}
+            
             .metric-value {{ font-size: 2.5rem; font-weight: 700; color: #333; }}
+            .text-muted {{ color: #6c757d !important; }}
             .text-muted-small {{ font-size: 0.85em; color: #6c757d; display: block; margin-top: 2px; }}
 
-            /* --- GIAO DIỆN DARK MODE (TỰ ĐỘNG) --- */
+            /* ========================================= */
+            /* 2. CẤU HÌNH DARK MODE (TỰ ĐỘNG KÍCH HOẠT) */
+            /* ========================================= */
             @media (prefers-color-scheme: dark) {{
+                /* Đổi màu chữ toàn trang */
                 body {{ color: #fafafa; }} 
                 
+                /* Đổi màu nền Card sang màu xám đen Streamlit */
                 .card {{ 
                     background-color: #262730; 
                     color: #fafafa;
                     box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+                    border: 1px solid #41444e;
                 }}
                 
                 .card-header {{ 
@@ -677,22 +686,39 @@ elif selected_tab == "Công Cụ Kiểm Thử":
 
                 .metric-value {{ color: #fafafa; }} 
                 .text-muted {{ color: #9da3af !important; }}
+                .text-muted-small {{ color: #9da3af; }}
                 
-                /* --- FIX LỖI TABLE HEADER TRẮNG Ở ĐÂY --- */
+                /* --- [FIX QUAN TRỌNG] XỬ LÝ BẢNG TRONG DARK MODE --- */
                 .table {{ color: #fafafa; border-color: #41444e; }}
                 
-                /* Target sâu vào thẻ th để ghi đè Bootstrap */
-                .table-light, 
+                /* Ép header của bảng (kể cả khi có class table-light) phải sang màu tối */
+                .table thead th, 
                 .table-light th {{ 
-                    background-color: #0e1117 !important; /* Màu nền header bảng tối hơn nền card xíu */
+                    background-color: #262730 !important; /* Màu trùng nền card */
                     color: #fafafa !important; 
                     border-color: #41444e;
+                    border-bottom: 2px solid #41444e;
                 }}
                 
-                .table-hover tbody tr:hover {{ color: #fafafa; background-color: #31333F; }}
+                /* Dòng dữ liệu */
+                .table tbody td {{
+                    background-color: transparent !important;
+                    color: #fafafa !important;
+                    border-bottom: 1px solid #41444e;
+                }}
                 
+                /* Hiệu ứng Hover: Sáng hơn xíu khi di chuột */
+                .table-hover tbody tr:hover td {{ 
+                    background-color: #31333F !important; 
+                    color: #ffffff !important; 
+                }}
+                
+                /* Nút trạng thái giữ nguyên độ tương phản */
                 .status-pass {{ background: #0f5132; color: #d1e7dd; }}
                 .status-fail {{ background: #842029; color: #f8d7da; }}
+                
+                /* Màu đỏ cảnh báo */
+                .text-danger {{ color: #ff6c6c !important; }}
             }}
         </style>
     </head>
@@ -709,7 +735,7 @@ elif selected_tab == "Công Cụ Kiểm Thử":
             <div class="col-md-4"><div class="card p-4 h-100"><h5 class="mb-4"><i class="fas fa-filter me-2"></i>Bộ lọc</h5><div class="d-grid gap-3"><button class="btn btn-outline-primary" onclick="filterData('ALL')">Tất cả</button><button class="btn btn-outline-success" onclick="filterData('PASS')">Pass</button><button class="btn btn-outline-danger" onclick="filterData('FAIL')">Fail</button></div></div></div>
         </div>
         <div class="card">
-            <div class="card-header bg-white py-3"><h5><i class="fas fa-table me-2"></i>Chi tiết Kết Quả</h5></div>
+            <div class="card-header py-3"><h5><i class="fas fa-table me-2"></i>Chi tiết Kết Quả</h5></div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
@@ -764,17 +790,25 @@ elif selected_tab == "Công Cụ Kiểm Thử":
             const pass=data.filter(d=>d.status==='PASS').length;
             const total=data.length;
             
+            // Tự động chỉnh màu chữ chú thích biểu đồ dựa trên theme
+            const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const labelColor = isDark ? '#fafafa' : '#666';
+
             if(chartInstance) chartInstance.destroy();
-            chartInstance=new Chart(ctx,{{type:'doughnut',data:{{labels:['Pass','Fail'],datasets:[{{data:[pass,total-pass],backgroundColor:['#198754','#dc3545'],borderWidth:0}}]}},options:{{responsive:true,maintainAspectRatio:false,cutout:'70%'}}}});
+            chartInstance=new Chart(ctx,{{type:'doughnut',data:{{labels:['Pass','Fail'],datasets:[{{data:[pass,total-pass],backgroundColor:['#198754','#dc3545'],borderWidth:0}}]}},
+            options:{{
+                responsive:true,
+                maintainAspectRatio:false,
+                cutout:'70%', 
+                plugins: {{ 
+                    legend: {{ labels: {{ color: labelColor }} }} 
+                }} 
+            }} }});
         }}
         
         function filterData(t) {{ 
-            // 1. Lọc dữ liệu
             currentData = t==='ALL' ? testData : testData.filter(d=>d.status===t); 
-            // 2. Vẽ lại bảng
             renderTable(currentData);
-            // 3. Vẽ lại biểu đồ theo dữ liệu đã lọc (Optional: nếu muốn biểu đồ cũng thay đổi theo filter)
-            // renderChart(currentData); <--- Nếu muốn biểu đồ đổi theo filter thì bỏ comment dòng này
         }}
         
         init();
