@@ -646,12 +646,54 @@ elif selected_tab == "Công Cụ Kiểm Thử":
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <style>
-            body {{ background-color: #ffffff; font-family: 'Segoe UI', sans-serif; }}
-            .card {{ border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 12px; margin-bottom: 20px; }}
-            .status-pass {{ color: #198754; font-weight: bold; background: #d1e7dd; padding: 4px 8px; border-radius: 6px; }}
-            .status-fail {{ color: #dc3545; font-weight: bold; background: #f8d7da; padding: 4px 8px; border-radius: 6px; }}
+            /* --- GIAO DIỆN LIGHT MODE (MẶC ĐỊNH) --- */
+            body {{ background-color: transparent; font-family: 'Segoe UI', sans-serif; color: #31333F; }}
+            
+            .card {{ 
+                border: none; 
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+                border-radius: 12px; 
+                margin-bottom: 20px; 
+                background-color: #ffffff; 
+            }}
             .metric-value {{ font-size: 2.5rem; font-weight: 700; color: #333; }}
             .text-muted-small {{ font-size: 0.85em; color: #6c757d; display: block; margin-top: 2px; }}
+
+            /* --- GIAO DIỆN DARK MODE (TỰ ĐỘNG) --- */
+            @media (prefers-color-scheme: dark) {{
+                body {{ color: #fafafa; }} 
+                
+                .card {{ 
+                    background-color: #262730; 
+                    color: #fafafa;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+                }}
+                
+                .card-header {{ 
+                    background-color: #262730 !important; 
+                    color: #fafafa; 
+                    border-bottom: 1px solid #41444e; 
+                }}
+
+                .metric-value {{ color: #fafafa; }} 
+                .text-muted {{ color: #9da3af !important; }}
+                
+                /* --- FIX LỖI TABLE HEADER TRẮNG Ở ĐÂY --- */
+                .table {{ color: #fafafa; border-color: #41444e; }}
+                
+                /* Target sâu vào thẻ th để ghi đè Bootstrap */
+                .table-light, 
+                .table-light th {{ 
+                    background-color: #0e1117 !important; /* Màu nền header bảng tối hơn nền card xíu */
+                    color: #fafafa !important; 
+                    border-color: #41444e;
+                }}
+                
+                .table-hover tbody tr:hover {{ color: #fafafa; background-color: #31333F; }}
+                
+                .status-pass {{ background: #0f5132; color: #d1e7dd; }}
+                .status-fail {{ background: #842029; color: #f8d7da; }}
+            }}
         </style>
     </head>
     <body>
@@ -690,10 +732,10 @@ elif selected_tab == "Công Cụ Kiểm Thử":
         let currentData = testData;
         let chartInstance = null;
         
-        function init() {{ calcMetrics(); renderTable(testData); if(testData.length>0) renderChart(); }}
+        function init() {{ calcMetrics(testData); renderTable(testData); if(testData.length>0) renderChart(testData); }}
         
-        function calcMetrics() {{
-            const total=testData.length; const pass=testData.filter(d=>d.status==='PASS').length;
+        function calcMetrics(data) {{
+            const total=data.length; const pass=data.filter(d=>d.status==='PASS').length;
             document.getElementById('totalCases').innerText=total; document.getElementById('totalPass').innerText=pass;
             document.getElementById('totalFail').innerText=total-pass;
             document.getElementById('accuracy').innerText=total>0?((pass/total)*100).toFixed(2)+'%':'0%';
@@ -703,8 +745,6 @@ elif selected_tab == "Công Cụ Kiểm Thử":
             const tb=document.getElementById('tableBody'); tb.innerHTML='';
             data.forEach(r=>{{
                 const cls=r.status==='PASS'?'status-pass':'status-fail';
-                
-                // Highlight chữ đỏ nếu thực tế khác mong đợi
                 const timeCls = (r.expected_time && r.actual_time && r.expected_time !== r.actual_time) ? 'text-danger fw-bold' : '';
                 const locCls = (r.expected_loc && r.actual_loc && r.expected_loc.toLowerCase() !== r.actual_loc.toLowerCase()) ? 'text-danger fw-bold' : '';
                 
@@ -719,14 +759,23 @@ elif selected_tab == "Công Cụ Kiểm Thử":
             }});
         }}
         
-        function renderChart() {{
+        function renderChart(data) {{
             const ctx=document.getElementById('resultChart').getContext('2d');
-            const pass=testData.filter(d=>d.status==='PASS').length;
+            const pass=data.filter(d=>d.status==='PASS').length;
+            const total=data.length;
+            
             if(chartInstance) chartInstance.destroy();
-            chartInstance=new Chart(ctx,{{type:'doughnut',data:{{labels:['Pass','Fail'],datasets:[{{data:[pass,testData.length-pass],backgroundColor:['#198754','#dc3545'],borderWidth:0}}]}},options:{{responsive:true,maintainAspectRatio:false,cutout:'70%'}}}});
+            chartInstance=new Chart(ctx,{{type:'doughnut',data:{{labels:['Pass','Fail'],datasets:[{{data:[pass,total-pass],backgroundColor:['#198754','#dc3545'],borderWidth:0}}]}},options:{{responsive:true,maintainAspectRatio:false,cutout:'70%'}}}});
         }}
         
-        function filterData(t) {{ currentData=t==='ALL'?testData:testData.filter(d=>d.status===t); renderTable(currentData); }}
+        function filterData(t) {{ 
+            // 1. Lọc dữ liệu
+            currentData = t==='ALL' ? testData : testData.filter(d=>d.status===t); 
+            // 2. Vẽ lại bảng
+            renderTable(currentData);
+            // 3. Vẽ lại biểu đồ theo dữ liệu đã lọc (Optional: nếu muốn biểu đồ cũng thay đổi theo filter)
+            // renderChart(currentData); <--- Nếu muốn biểu đồ đổi theo filter thì bỏ comment dòng này
+        }}
         
         init();
     </script>
